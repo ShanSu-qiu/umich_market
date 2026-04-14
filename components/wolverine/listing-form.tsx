@@ -166,7 +166,31 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
     }
   }
 
-  const handleFormSubmit = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const toDataUrl = (url: string): Promise<string> => {
+    // Already a data URL — keep as-is
+    if (url.startsWith("data:")) return Promise.resolve(url)
+    return fetch(url)
+      .then((r) => r.blob())
+      .then(
+        (blob) =>
+          new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.readAsDataURL(blob)
+          })
+      )
+  }
+
+  const handleFormSubmit = async () => {
+    setIsSubmitting(true)
+    const persistedPhotos = await Promise.all(
+      photos.map(async (p) => ({
+        file: p.file,
+        previewUrl: await toDataUrl(p.previewUrl),
+      }))
+    )
     onSubmit({
       title,
       description,
@@ -175,7 +199,7 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
       price,
       enablePrebook,
       pickupLocation,
-      photos,
+      photos: persistedPhotos,
     })
   }
 
@@ -520,10 +544,10 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
                   ) : (
                     <Button
                       onClick={handleFormSubmit}
-                      disabled={!canProceed()}
+                      disabled={!canProceed() || isSubmitting}
                       className="bg-maize text-maize-foreground hover:bg-maize/90"
                     >
-                      {submitLabel}
+                      {isSubmitting ? "Saving..." : submitLabel}
                     </Button>
                   )}
                 </div>

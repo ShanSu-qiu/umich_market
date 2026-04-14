@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useParams, notFound } from "next/navigation"
-import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,29 +10,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Calendar } from "@/components/ui/calendar"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { 
-  Star, 
-  MapPin, 
-  MessageCircle, 
-  Calendar as CalendarIcon, 
-  ShieldCheck, 
-  ChevronLeft, 
+import {
+  MapPin,
+  MessageCircle,
+  Calendar as CalendarIcon,
+  ChevronLeft,
   ChevronRight,
-  TrendingDown,
-  TrendingUp,
   Clock,
   CheckCircle2
 } from "lucide-react"
-import { CreditScoreBadge } from "@/components/wolverine/credit-score-badge"
 import { PreBookBadge } from "@/components/wolverine/pre-book-badge"
 import { ItemCard } from "@/components/wolverine/item-card"
-import { type Item } from "@/lib/data"
+import { useListings } from "@/lib/listings-context"
 
 export default function ItemDetailPage() {
   const params = useParams()
+  const { getListingById, getAllListings } = useListings()
 
-  // TODO: Replace with real data fetching
-  const item: Item | undefined = undefined
+  const listing = getListingById(params.id as string)
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [preBookDate, setPreBookDate] = useState<Date | undefined>()
@@ -42,36 +36,49 @@ export default function ItemDetailPage() {
   const [messageOpen, setMessageOpen] = useState(false)
   const [message, setMessage] = useState("")
 
-  if (!item) {
+  if (!listing) {
     notFound()
   }
 
-  // TODO: Replace with real data fetching
-  const similarItems: Item[] = []
-  
+  const similarItems = getAllListings()
+    .filter((l) => l.id !== listing.id && l.category === listing.category)
+    .slice(0, 4)
+    .map((l) => ({
+      id: l.id,
+      title: l.title,
+      description: l.description,
+      price: l.price,
+      condition: l.condition,
+      category: l.category,
+      images: l.images,
+      sellerId: l.sellerId,
+      sellerName: l.sellerName,
+      pickupLocation: l.pickupLocation,
+      preBookAvailable: l.preBookAvailable,
+      createdAt: l.createdAt,
+    }))
+
   const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % item.images.length)
+    setCurrentImageIndex((prev) => (prev + 1) % listing.images.length)
   }
-  
+
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + item.images.length) % item.images.length)
+    setCurrentImageIndex((prev) => (prev - 1 + listing.images.length) % listing.images.length)
   }
-  
+
   const handlePreBook = () => {
-    // In a real app, this would submit to an API
     alert(`Pre-booking submitted for ${preBookDate?.toLocaleDateString()}!\nNotes: ${preBookNotes}`)
     setPreBookOpen(false)
     setPreBookDate(undefined)
     setPreBookNotes("")
   }
-  
+
   const handleMessage = () => {
-    // In a real app, this would submit to an API
-    alert(`Message sent to ${item.sellerName}!`)
+    alert(`Message sent to ${listing.sellerName}!`)
     setMessageOpen(false)
     setMessage("")
   }
-  
+
   return (
     <div className="min-h-screen py-6 sm:py-8">
       <div className="mx-auto max-w-6xl px-4">
@@ -81,29 +88,28 @@ export default function ItemDetailPage() {
             Browse
           </Link>
           <span>/</span>
-          <Link 
-            href={`/browse?category=${encodeURIComponent(item.category)}`}
+          <Link
+            href={`/browse?category=${encodeURIComponent(listing.category)}`}
             className="hover:text-foreground transition-colors"
           >
-            {item.category}
+            {listing.category}
           </Link>
           <span>/</span>
-          <span className="text-foreground truncate">{item.title}</span>
+          <span className="text-foreground truncate">{listing.title}</span>
         </nav>
-        
+
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Image Gallery */}
           <div className="space-y-4">
             <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
-              <Image
-                src={item.images[currentImageIndex]}
-                alt={item.title}
-                fill
-                className="object-cover"
-                priority
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={listing.images[currentImageIndex]}
+                alt={listing.title}
+                className="absolute inset-0 w-full h-full object-cover"
               />
-              
-              {item.images.length > 1 && (
+
+              {listing.images.length > 1 && (
                 <>
                   <button
                     onClick={prevImage}
@@ -121,20 +127,20 @@ export default function ItemDetailPage() {
                   </button>
                 </>
               )}
-              
+
               {/* Badges */}
               <div className="absolute top-4 left-4 flex flex-col gap-2">
-                {item.preBookAvailable && <PreBookBadge />}
+                {listing.preBookAvailable && <PreBookBadge />}
               </div>
               <Badge variant="secondary" className="absolute top-4 right-4">
-                {item.condition}
+                {listing.condition}
               </Badge>
             </div>
-            
+
             {/* Thumbnails */}
-            {item.images.length > 1 && (
+            {listing.images.length > 1 && (
               <div className="flex gap-2">
-                {item.images.map((image, index) => (
+                {listing.images.map((image, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentImageIndex(index)}
@@ -142,112 +148,61 @@ export default function ItemDetailPage() {
                       index === currentImageIndex ? "border-primary" : "border-transparent"
                     }`}
                   >
-                    <Image
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
                       src={image}
-                      alt={`${item.title} ${index + 1}`}
-                      fill
-                      className="object-cover"
+                      alt={`${listing.title} ${index + 1}`}
+                      className="absolute inset-0 w-full h-full object-cover"
                     />
                   </button>
                 ))}
               </div>
             )}
           </div>
-          
+
           {/* Details */}
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-balance">{item.title}</h1>
-              <p className="text-3xl sm:text-4xl font-bold text-primary">${item.price}</p>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-balance">{listing.title}</h1>
+              <p className="text-3xl sm:text-4xl font-bold text-primary">${listing.price}</p>
             </div>
-            
-            {/* Demand Indicator */}
-            {item.demandIndicator && (
-              <div className={`flex items-center gap-2 p-3 rounded-lg ${
-                item.demandIndicator.type === "below" 
-                  ? "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
-                  : item.demandIndicator.type === "above"
-                  ? "bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300"
-                  : "bg-muted text-muted-foreground"
-              }`}>
-                {item.demandIndicator.type === "below" ? (
-                  <>
-                    <TrendingDown className="w-5 h-5" />
-                    <span className="text-sm font-medium">
-                      This item is priced {item.demandIndicator.percentage}% below similar listings
-                    </span>
-                  </>
-                ) : item.demandIndicator.type === "above" ? (
-                  <>
-                    <TrendingUp className="w-5 h-5" />
-                    <span className="text-sm font-medium">
-                      High demand - similar items selling fast
-                    </span>
-                  </>
-                ) : null}
-              </div>
-            )}
-            
+
             {/* Description */}
             <div>
               <h2 className="font-semibold mb-2">Description</h2>
-              <p className="text-muted-foreground leading-relaxed">{item.description}</p>
+              <p className="text-muted-foreground leading-relaxed">
+                {listing.description || "No description provided."}
+              </p>
             </div>
-            
+
             {/* Pickup Location */}
             <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
               <MapPin className="w-5 h-5 text-primary shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium">{item.pickupLocation}</p>
-                <p className="text-sm text-muted-foreground">{item.pickupArea}</p>
+                <p className="font-medium">{listing.pickupLocation}</p>
               </div>
             </div>
-            
+
             {/* Seller Card */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Seller Information</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-lg font-semibold text-primary">
-                        {item.sellerName.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-semibold">{item.sellerName}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        {item.sellerVerified && (
-                          <span className="flex items-center gap-1 text-primary">
-                            <ShieldCheck className="w-4 h-4" />
-                            Verified
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <CreditScoreBadge rating={item.sellerRating} size="lg" showLabel />
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 text-center text-sm">
-                  <div>
-                    <p className="font-semibold">{item.sellerTransactions}</p>
-                    <p className="text-muted-foreground">Sales</p>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-lg font-semibold text-primary">
+                      {listing.sellerName.charAt(0)}
+                    </span>
                   </div>
                   <div>
-                    <p className="font-semibold">{item.sellerRating}</p>
-                    <p className="text-muted-foreground">Rating</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold">{item.sellerMemberSince}</p>
-                    <p className="text-muted-foreground">Member since</p>
+                    <p className="font-semibold">{listing.sellerName}</p>
+                    <p className="text-sm text-muted-foreground">{listing.sellerEmail}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-            
+
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
               <Dialog open={messageOpen} onOpenChange={setMessageOpen}>
@@ -259,7 +214,7 @@ export default function ItemDetailPage() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Message {item.sellerName}</DialogTitle>
+                    <DialogTitle>Message {listing.sellerName}</DialogTitle>
                     <DialogDescription>
                       Send a message about this item. The seller will be notified via email.
                     </DialogDescription>
@@ -268,7 +223,7 @@ export default function ItemDetailPage() {
                     <div className="space-y-2">
                       <Label>Your Message</Label>
                       <Textarea
-                        placeholder={`Hi! I'm interested in "${item.title}"...`}
+                        placeholder={`Hi! I'm interested in "${listing.title}"...`}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         rows={4}
@@ -285,8 +240,8 @@ export default function ItemDetailPage() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-              
-              {item.preBookAvailable ? (
+
+              {listing.preBookAvailable ? (
                 <Dialog open={preBookOpen} onOpenChange={setPreBookOpen}>
                   <DialogTrigger asChild>
                     <Button className="flex-1 bg-maize text-maize-foreground hover:bg-maize/90" size="lg">
@@ -336,8 +291,8 @@ export default function ItemDetailPage() {
                       <Button variant="outline" onClick={() => setPreBookOpen(false)}>
                         Cancel
                       </Button>
-                      <Button 
-                        onClick={handlePreBook} 
+                      <Button
+                        onClick={handlePreBook}
                         disabled={!preBookDate}
                         className="bg-maize text-maize-foreground hover:bg-maize/90"
                       >
@@ -355,7 +310,7 @@ export default function ItemDetailPage() {
             </div>
           </div>
         </div>
-        
+
         {/* Similar Items */}
         {similarItems.length > 0 && (
           <section className="mt-12 pt-8 border-t">
