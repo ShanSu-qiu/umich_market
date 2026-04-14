@@ -22,6 +22,8 @@ export type Listing = {
 type ListingsContextType = {
   listings: Listing[]
   addListing: (listing: Omit<Listing, "id" | "createdAt" | "status">) => Listing
+  updateListing: (id: string, data: Partial<Omit<Listing, "id" | "createdAt" | "sellerEmail" | "sellerId">>) => boolean
+  getListingById: (id: string) => Listing | undefined
   getMyListings: (email: string) => Listing[]
   getAllListings: () => Listing[]
 }
@@ -29,6 +31,8 @@ type ListingsContextType = {
 const ListingsContext = createContext<ListingsContextType>({
   listings: [],
   addListing: () => ({ id: "", createdAt: "", status: "Active" } as Listing),
+  updateListing: () => false,
+  getListingById: () => undefined,
   getMyListings: () => [],
   getAllListings: () => [],
 })
@@ -66,6 +70,24 @@ export function ListingsProvider({ children }: { children: React.ReactNode }) {
     return newListing
   }, [])
 
+  const updateListing = useCallback((id: string, data: Partial<Omit<Listing, "id" | "createdAt" | "sellerEmail" | "sellerId">>) => {
+    let found = false
+    setListings((prev) =>
+      prev.map((l) => {
+        if (l.id === id) {
+          found = true
+          return { ...l, ...data }
+        }
+        return l
+      })
+    )
+    return found
+  }, [])
+
+  const getListingById = useCallback((id: string) => {
+    return listings.find((l) => l.id === id)
+  }, [listings])
+
   const getMyListings = useCallback((email: string) => {
     return listings.filter((l) => l.sellerEmail === email)
   }, [listings])
@@ -75,7 +97,7 @@ export function ListingsProvider({ children }: { children: React.ReactNode }) {
   }, [listings])
 
   return (
-    <ListingsContext.Provider value={{ listings, addListing, getMyListings, getAllListings }}>
+    <ListingsContext.Provider value={{ listings, addListing, updateListing, getListingById, getMyListings, getAllListings }}>
       {children}
     </ListingsContext.Provider>
   )

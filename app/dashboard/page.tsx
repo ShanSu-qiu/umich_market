@@ -13,6 +13,7 @@ import {
   Star,
   Plus,
   LogIn,
+  Pencil,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useListings } from "@/lib/listings-context"
@@ -228,9 +229,20 @@ export default function DashboardPage() {
                               <p className="font-semibold line-clamp-1">{listing.title}</p>
                               <p className="text-lg font-bold text-primary">${listing.price}</p>
                             </div>
-                            <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400">
-                              {listing.status}
-                            </Badge>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {listing.status !== "Sold" && (
+                                <Link
+                                  href={`/sell/edit/${listing.id}`}
+                                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                  Edit
+                                </Link>
+                              )}
+                              <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400">
+                                {listing.status}
+                              </Badge>
+                            </div>
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">
                             {listing.category} &middot; {listing.condition} &middot; {listing.pickupLocation}
