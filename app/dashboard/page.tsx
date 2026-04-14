@@ -45,7 +45,7 @@ const myPurchases = [
     seller: "Alex P. '26",
     status: "Completed",
     date: "Apr 10, 2024",
-    image: "/placeholder.svg?height=100&width=100",
+    image: "/placeholder.svg",
   },
   {
     id: "p2",
@@ -54,7 +54,7 @@ const myPurchases = [
     seller: "Jordan M. '25",
     status: "Pending Pickup",
     date: "Apr 18, 2024",
-    image: "/placeholder.svg?height=100&width=100",
+    image: "/placeholder.svg",
   },
 ]
 
@@ -66,7 +66,7 @@ const preBookings = [
     buyer: "Taylor S. '28",
     pickupDate: "Aug 25, 2024",
     status: "Confirmed",
-    image: "/placeholder.svg?height=100&width=100",
+    image: "/placeholder.svg",
   },
 ]
 

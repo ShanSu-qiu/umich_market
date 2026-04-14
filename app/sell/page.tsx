@@ -200,11 +200,11 @@ export default function SellPage() {
                     >
                       {photos.map((photo, index) => (
                         <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-                          <Image
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
                             src={photo}
                             alt={`Photo ${index + 1}`}
-                            fill
-                            className="object-cover"
+                            className="absolute inset-0 w-full h-full object-cover"
                           />
                           <button
                             onClick={() => removePhoto(index)}
