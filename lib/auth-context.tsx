@@ -1,8 +1,8 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { User } from "@supabase/supabase-js"
+import type { SupabaseClient, User } from "@supabase/supabase-js"
 
 export type AuthUser = {
   id: string
@@ -34,22 +34,36 @@ function mapUser(supabaseUser: User, displayName?: string): AuthUser {
   }
 }
 
+function getClient(): SupabaseClient {
+  return createClient()
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const supabase = createClient()
+  const clientRef = useRef<SupabaseClient | null>(null)
 
-  // Fetch profile display_name from profiles table
+  // Lazily get the Supabase client (only on client side)
+  const getSupabase = useCallback(() => {
+    if (!clientRef.current) {
+      clientRef.current = getClient()
+    }
+    return clientRef.current
+  }, [])
+
   const fetchProfile = useCallback(async (supabaseUser: User): Promise<AuthUser> => {
+    const supabase = getSupabase()
     const { data } = await supabase
       .from("profiles")
       .select("display_name")
       .eq("id", supabaseUser.id)
       .single()
     return mapUser(supabaseUser, data?.display_name)
-  }, [supabase])
+  }, [getSupabase])
 
   useEffect(() => {
+    const supabase = getSupabase()
+
     // Initial session check
     const init = async () => {
       const { data: { user: supabaseUser } } = await supabase.auth.getUser()
@@ -75,21 +89,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
 
     return () => subscription.unsubscribe()
-  }, [supabase, fetchProfile])
+  }, [getSupabase, fetchProfile])
 
   const signIn = useCallback(async (email: string, password: string): Promise<{ error?: string }> => {
-    if (!email.endsWith("@umich.edu")) {
-      return { error: "Please use your @umich.edu email address" }
-    }
+    const supabase = getSupabase()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) return { error: error.message }
     return {}
-  }, [supabase])
+  }, [getSupabase])
 
   const signUp = useCallback(async (name: string, email: string, password: string): Promise<{ error?: string }> => {
-    if (!email.endsWith("@umich.edu")) {
-      return { error: "Please use your @umich.edu email address" }
-    }
+    const supabase = getSupabase()
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -97,12 +107,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
     if (error) return { error: error.message }
     return {}
-  }, [supabase])
+  }, [getSupabase])
 
   const signOutFn = useCallback(async () => {
+    const supabase = getSupabase()
     await supabase.auth.signOut()
     setUser(null)
-  }, [supabase])
+  }, [getSupabase])
 
   return (
     <AuthContext.Provider value={{ user, isLoading, signIn, signUp, signOut: signOutFn }}>

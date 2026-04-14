@@ -79,7 +79,7 @@ export default function DashboardPage() {
               </div>
               <h1 className="text-2xl font-bold mb-2">Welcome to WolverineMarket</h1>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                Sign in with your @umich.edu email to access your dashboard, manage listings, and track your transactions.
+                Sign in to access your dashboard, manage listings, and track your transactions.
               </p>
               <div className="flex gap-3 justify-center">
                 <Button asChild size="lg">

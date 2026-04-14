@@ -25,11 +25,6 @@ export default function SignupPage() {
     e.preventDefault()
     setError("")
     
-    if (!email.endsWith("@umich.edu")) {
-      setError("Please use your @umich.edu email address")
-      return
-    }
-    
     if (password.length < 8) {
       setError("Password must be at least 8 characters")
       return
@@ -52,7 +47,7 @@ export default function SignupPage() {
     router.push("/dashboard")
   }
   
-  const isValidEmail = email.endsWith("@umich.edu") || email === ""
+  const isValidEmail = email.includes("@") || email === ""
   
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
@@ -63,7 +58,7 @@ export default function SignupPage() {
             Join the trusted marketplace for Michigan students
           </h1>
           <p className="text-muted-foreground mb-8">
-            Buy and sell with confidence knowing everyone is verified with their @umich.edu email.
+            Buy and sell with confidence knowing everyone is a verified Michigan student.
           </p>
           
           <div className="space-y-6">
@@ -145,7 +140,7 @@ export default function SignupPage() {
                       <TooltipContent className="max-w-xs">
                         <p className="font-semibold mb-1">Why we verify emails</p>
                         <p className="text-xs">
-                          We require @umich.edu emails to ensure all users are current students or staff, creating a safer marketplace community.
+                          We verify all users to ensure a safer marketplace community for students and staff.
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -156,7 +151,7 @@ export default function SignupPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="you@umich.edu"
+                    placeholder="your@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className={`pl-10 ${!isValidEmail ? "border-destructive" : ""}`}
@@ -165,7 +160,7 @@ export default function SignupPage() {
                 </div>
                 {!isValidEmail && (
                   <p className="text-xs text-destructive">
-                    Please use your @umich.edu email address
+                    Please enter a valid email address
                   </p>
                 )}
               </div>

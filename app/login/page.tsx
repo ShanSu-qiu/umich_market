@@ -22,11 +22,6 @@ export default function LoginPage() {
     e.preventDefault()
     setError("")
 
-    if (!email.endsWith("@umich.edu")) {
-      setError("Please use your @umich.edu email address")
-      return
-    }
-
     setIsLoading(true)
     const result = await signIn(email, password)
     setIsLoading(false)
@@ -60,7 +55,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@umich.edu"
+                  placeholder="your@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"

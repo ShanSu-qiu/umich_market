@@ -1,7 +1,8 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { useAuth } from "@/lib/auth-context"
 
 export type Listing = {
@@ -91,9 +92,17 @@ export function ListingsProvider({ children }: { children: React.ReactNode }) {
   const [listings, setListings] = useState<Listing[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { user } = useAuth()
-  const supabase = createClient()
+  const clientRef = useRef<SupabaseClient | null>(null)
+
+  const getSupabase = useCallback(() => {
+    if (!clientRef.current) {
+      clientRef.current = createClient()
+    }
+    return clientRef.current
+  }, [])
 
   const fetchListings = useCallback(async () => {
+    const supabase = getSupabase()
     const { data, error } = await supabase
       .from("listings")
       .select("*, profiles(display_name, email)")
@@ -107,7 +116,7 @@ export function ListingsProvider({ children }: { children: React.ReactNode }) {
 
     setListings((data || []).map(mapRow))
     setIsLoading(false)
-  }, [supabase])
+  }, [getSupabase])
 
   useEffect(() => {
     fetchListings()
@@ -125,6 +134,7 @@ export function ListingsProvider({ children }: { children: React.ReactNode }) {
   }): Promise<Listing | null> => {
     if (!user) return null
 
+    const supabase = getSupabase()
     const { data: row, error } = await supabase
       .from("listings")
       .insert({
@@ -149,7 +159,7 @@ export function ListingsProvider({ children }: { children: React.ReactNode }) {
     const newListing = mapRow(row)
     setListings((prev) => [newListing, ...prev])
     return newListing
-  }, [supabase, user])
+  }, [getSupabase, user])
 
   const updateListing = useCallback(async (id: string, data: Partial<{
     title: string
@@ -172,6 +182,7 @@ export function ListingsProvider({ children }: { children: React.ReactNode }) {
     if (data.preBookAvailable !== undefined) updateData.pre_booking_enabled = data.preBookAvailable
     updateData.updated_at = new Date().toISOString()
 
+    const supabase = getSupabase()
     const { data: row, error } = await supabase
       .from("listings")
       .update(updateData)
@@ -187,7 +198,7 @@ export function ListingsProvider({ children }: { children: React.ReactNode }) {
     const updated = mapRow(row)
     setListings((prev) => prev.map((l) => (l.id === id ? updated : l)))
     return true
-  }, [supabase])
+  }, [getSupabase])
 
   const getListingById = useCallback((id: string) => {
     return listings.find((l) => l.id === id)
