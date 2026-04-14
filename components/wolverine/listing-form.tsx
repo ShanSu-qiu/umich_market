@@ -83,6 +83,13 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
 
   const [isDragging, setIsDragging] = useState(false)
 
+  const fileToDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.readAsDataURL(file)
+    })
+
   const processFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files)
     const converted: { file: File; previewUrl: string }[] = []
@@ -104,12 +111,14 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
             file.name.replace(/\.heic$/i, ".jpg").replace(/\.heif$/i, ".jpg"),
             { type: "image/jpeg" }
           )
-          converted.push({ file: jpegFile, previewUrl: URL.createObjectURL(jpegFile) })
+          const dataUrl = await fileToDataUrl(jpegFile)
+          converted.push({ file: jpegFile, previewUrl: dataUrl })
         } catch (err) {
           console.error("HEIC conversion failed:", err)
         }
       } else if (file.type.startsWith("image/")) {
-        converted.push({ file, previewUrl: URL.createObjectURL(file) })
+        const dataUrl = await fileToDataUrl(file)
+        converted.push({ file, previewUrl: dataUrl })
       }
     }
     setIsConverting(false)
@@ -142,11 +151,7 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
   }, [processFiles])
 
   const removePhoto = (index: number) => {
-    setPhotos((prev) => {
-      const removed = prev[index]
-      if (removed?.file) URL.revokeObjectURL(removed.previewUrl)
-      return prev.filter((_, i) => i !== index)
-    })
+    setPhotos((prev) => prev.filter((_, i) => i !== index))
   }
 
   const canProceed = () => {
@@ -166,31 +171,7 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
     }
   }
 
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const toDataUrl = (url: string): Promise<string> => {
-    // Already a data URL — keep as-is
-    if (url.startsWith("data:")) return Promise.resolve(url)
-    return fetch(url)
-      .then((r) => r.blob())
-      .then(
-        (blob) =>
-          new Promise<string>((resolve) => {
-            const reader = new FileReader()
-            reader.onloadend = () => resolve(reader.result as string)
-            reader.readAsDataURL(blob)
-          })
-      )
-  }
-
-  const handleFormSubmit = async () => {
-    setIsSubmitting(true)
-    const persistedPhotos = await Promise.all(
-      photos.map(async (p) => ({
-        file: p.file,
-        previewUrl: await toDataUrl(p.previewUrl),
-      }))
-    )
+  const handleFormSubmit = () => {
     onSubmit({
       title,
       description,
@@ -199,7 +180,7 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
       price,
       enablePrebook,
       pickupLocation,
-      photos: persistedPhotos,
+      photos,
     })
   }
 
@@ -544,10 +525,10 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
                   ) : (
                     <Button
                       onClick={handleFormSubmit}
-                      disabled={!canProceed() || isSubmitting}
+                      disabled={!canProceed()}
                       className="bg-maize text-maize-foreground hover:bg-maize/90"
                     >
-                      {isSubmitting ? "Saving..." : submitLabel}
+                      {submitLabel}
                     </Button>
                   )}
                 </div>
