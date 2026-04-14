@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,6 +27,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
+import heic2any from "heic2any"
 import { CampusLocationPicker } from "@/components/wolverine/campus-location-picker"
 import { categories } from "@/lib/data"
 
@@ -51,7 +51,8 @@ export default function SellPage() {
   const [currentStep, setCurrentStep] = useState(1)
   
   // Form state
-  const [photos, setPhotos] = useState<string[]>([])
+  const [photos, setPhotos] = useState<{ file: File; previewUrl: string }[]>([])
+  const [isConverting, setIsConverting] = useState(false)
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [category, setCategory] = useState("")
@@ -67,11 +68,38 @@ export default function SellPage() {
   // Suggested price (mock)
   const suggestedPrice = 45
 
-  const processFiles = useCallback((files: FileList | File[]) => {
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"))
-    if (imageFiles.length === 0) return
-    const newPhotos = imageFiles.map((file) => URL.createObjectURL(file))
-    setPhotos((prev) => [...prev, ...newPhotos].slice(0, 6))
+  const processFiles = useCallback(async (files: FileList | File[]) => {
+    const fileArray = Array.from(files)
+    const converted: { file: File; previewUrl: string }[] = []
+
+    setIsConverting(true)
+    for (const file of fileArray) {
+      const isHeic =
+        file.type === "image/heic" ||
+        file.type === "image/heif" ||
+        file.name.toLowerCase().endsWith(".heic") ||
+        file.name.toLowerCase().endsWith(".heif")
+
+      if (isHeic) {
+        try {
+          const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 })
+          const jpegFile = new File(
+            [blob as Blob],
+            file.name.replace(/\.heic$/i, ".jpg").replace(/\.heif$/i, ".jpg"),
+            { type: "image/jpeg" }
+          )
+          converted.push({ file: jpegFile, previewUrl: URL.createObjectURL(jpegFile) })
+        } catch (err) {
+          console.error("HEIC conversion failed:", err)
+        }
+      } else if (file.type.startsWith("image/")) {
+        converted.push({ file, previewUrl: URL.createObjectURL(file) })
+      }
+    }
+    setIsConverting(false)
+
+    if (converted.length === 0) return
+    setPhotos((prev) => [...prev, ...converted].slice(0, 6))
   }, [])
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,9 +124,13 @@ export default function SellPage() {
     setIsDragging(false)
     if (e.dataTransfer.files) processFiles(e.dataTransfer.files)
   }, [processFiles])
-  
+
   const removePhoto = (index: number) => {
-    setPhotos((prev) => prev.filter((_, i) => i !== index))
+    setPhotos((prev) => {
+      const removed = prev[index]
+      if (removed) URL.revokeObjectURL(removed.previewUrl)
+      return prev.filter((_, i) => i !== index)
+    })
   }
   
   const canProceed = () => {
@@ -202,7 +234,7 @@ export default function SellPage() {
                         <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={photo}
+                            src={photo.previewUrl}
                             alt={`Photo ${index + 1}`}
                             className="absolute inset-0 w-full h-full object-cover"
                           />
@@ -227,11 +259,11 @@ export default function SellPage() {
                         )}>
                           <Upload className={cn("w-8 h-8 mb-2", isDragging ? "text-maize" : "text-muted-foreground")} />
                           <span className={cn("text-sm", isDragging ? "text-maize font-medium" : "text-muted-foreground")}>
-                            {isDragging ? "Drop here" : "Add Photo"}
+                            {isConverting ? "Converting..." : isDragging ? "Drop here" : "Add Photo"}
                           </span>
                           <input
                             type="file"
-                            accept="image/*"
+                            accept="image/*,.heic,.heif"
                             multiple
                             className="hidden"
                             onChange={handlePhotoUpload}
@@ -498,11 +530,11 @@ export default function SellPage() {
               <Card className="overflow-hidden">
                 <div className="relative aspect-square bg-muted">
                   {photos[0] ? (
-                    <Image
-                      src={photos[0]}
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={photos[0].previewUrl}
                       alt="Preview"
-                      fill
-                      className="object-cover"
+                      className="absolute inset-0 w-full h-full object-cover"
                     />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
