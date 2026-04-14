@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Package, Mail, Lock, ArrowRight } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
 
 export default function LoginPage() {
   const router = useRouter()
+  const { signIn } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -29,8 +31,10 @@ export default function LoginPage() {
     
     // Simulate login
     await new Promise((resolve) => setTimeout(resolve, 1000))
-    
-    // In a real app, this would authenticate with a backend
+
+    // Store auth state
+    const name = email.split("@")[0].replace(/\./g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    signIn({ name, email })
     router.push("/dashboard")
   }
   

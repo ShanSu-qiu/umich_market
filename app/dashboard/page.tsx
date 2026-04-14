@@ -12,10 +12,13 @@ import {
   Calendar,
   Star,
   Plus,
+  LogIn,
 } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("listings")
+  const { user, isLoading } = useAuth()
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -36,6 +39,62 @@ export default function DashboardPage() {
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen py-6 sm:py-8">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="animate-pulse space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-muted" />
+              <div className="space-y-2">
+                <div className="h-6 w-40 bg-muted rounded" />
+                <div className="h-4 w-56 bg-muted rounded" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-20 bg-muted rounded-lg" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Not signed in — show sign-in prompt
+  if (!user) {
+    return (
+      <div className="min-h-screen py-6 sm:py-8">
+        <div className="mx-auto max-w-6xl px-4">
+          <Card>
+            <CardContent className="py-16 text-center">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+                <LogIn className="w-8 h-8 text-primary" />
+              </div>
+              <h1 className="text-2xl font-bold mb-2">Welcome to WolverineMarket</h1>
+              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                Sign in with your @umich.edu email to access your dashboard, manage listings, and track your transactions.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button asChild size="lg">
+                  <Link href="/login">
+                    <LogIn className="w-4 h-4 mr-2" />
+                    Sign In
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg">
+                  <Link href="/signup">Create Account</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  // Signed in — show full dashboard
   return (
     <div className="min-h-screen py-6 sm:py-8">
       <div className="mx-auto max-w-6xl px-4">
@@ -43,24 +102,21 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-2xl font-bold text-primary">?</span>
+              <span className="text-2xl font-bold text-primary">
+                {user.name.charAt(0).toUpperCase()}
+              </span>
             </div>
             <div>
-              <h1 className="text-2xl font-bold">My Dashboard</h1>
-              <p className="text-muted-foreground">Sign in to view your profile</p>
+              <h1 className="text-2xl font-bold">{user.name}</h1>
+              <p className="text-muted-foreground">{user.email}</p>
             </div>
           </div>
-          <div className="flex gap-3">
-            <Button asChild variant="outline">
-              <Link href="/login">Sign In</Link>
-            </Button>
-            <Button asChild className="bg-maize text-maize-foreground hover:bg-maize/90">
-              <Link href="/sell">
-                <Plus className="w-4 h-4 mr-2" />
-                List New Item
-              </Link>
-            </Button>
-          </div>
+          <Button asChild className="bg-maize text-maize-foreground hover:bg-maize/90">
+            <Link href="/sell">
+              <Plus className="w-4 h-4 mr-2" />
+              List New Item
+            </Link>
+          </Button>
         </div>
 
         {/* Stats */}

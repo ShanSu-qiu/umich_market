@@ -9,9 +9,11 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Package, Mail, Lock, User, ArrowRight, HelpCircle, ShieldCheck, Star, Users } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
 
 export default function SignupPage() {
   const router = useRouter()
+  const { signIn } = useAuth()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -42,8 +44,9 @@ export default function SignupPage() {
     
     // Simulate signup
     await new Promise((resolve) => setTimeout(resolve, 1000))
-    
-    // In a real app, this would create an account with a backend
+
+    // Store auth state
+    signIn({ name, email })
     router.push("/dashboard")
   }
   
