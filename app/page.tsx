@@ -2,21 +2,17 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, ArrowRight, Calendar } from "lucide-react"
+import { Search, ArrowRight, Calendar, Package } from "lucide-react"
 import { SeasonalBanner } from "@/components/wolverine/seasonal-banner"
-import { ItemCard } from "@/components/wolverine/item-card"
 import { TrustIndicators } from "@/components/wolverine/trust-indicators"
-import { mockItems, categories } from "@/lib/data"
+import { categories } from "@/lib/data"
 
 export default function HomePage() {
-  const featuredItems = mockItems.slice(0, 6)
-  const preBookItems = mockItems.filter((item) => item.preBookAvailable).slice(0, 4)
-
   return (
     <div className="flex flex-col">
       {/* Hero Section with Seasonal Banner */}
       <SeasonalBanner />
-      
+
       {/* Search Section */}
       <section className="py-8 sm:py-12 px-4 -mt-8 relative z-10">
         <div className="mx-auto max-w-2xl">
@@ -35,13 +31,13 @@ export default function HomePage() {
                 Search
               </Button>
             </form>
-            
+
             {/* Category Chips */}
             <div className="flex flex-wrap gap-2 mt-4">
               {categories.map((category) => (
                 <Link key={category} href={`/browse?category=${encodeURIComponent(category)}`}>
-                  <Badge 
-                    variant="secondary" 
+                  <Badge
+                    variant="secondary"
                     className="cursor-pointer hover:bg-maize hover:text-maize-foreground transition-colors px-3 py-1.5"
                   >
                     {category}
@@ -52,7 +48,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      
+
       {/* Featured Listings */}
       <section className="py-8 sm:py-12 px-4">
         <div className="mx-auto max-w-6xl">
@@ -65,15 +61,22 @@ export default function HomePage() {
               </Link>
             </Button>
           </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {featuredItems.map((item) => (
-              <ItemCard key={item.id} item={item} />
-            ))}
+
+          <div className="text-center py-16">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+              <Package className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="font-semibold text-lg mb-2">No listings yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Be the first to list an item for Michigan students!
+            </p>
+            <Button asChild>
+              <Link href="/sell">Start Selling</Link>
+            </Button>
           </div>
         </div>
       </section>
-      
+
       {/* Pre-book Section */}
       <section className="py-8 sm:py-12 px-4 bg-muted/50">
         <div className="mx-auto max-w-6xl">
@@ -94,18 +97,18 @@ export default function HomePage() {
               </Link>
             </Button>
           </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {preBookItems.map((item) => (
-              <ItemCard key={item.id} item={item} />
-            ))}
+
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">
+              No pre-book items available yet. Check back soon!
+            </p>
           </div>
         </div>
       </section>
-      
+
       {/* Trust Indicators */}
       <TrustIndicators />
-      
+
       {/* CTA Section */}
       <section className="py-12 sm:py-16 px-4 bg-primary text-primary-foreground">
         <div className="mx-auto max-w-4xl text-center">

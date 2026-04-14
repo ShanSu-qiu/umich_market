@@ -27,26 +27,27 @@ import {
 import { CreditScoreBadge } from "@/components/wolverine/credit-score-badge"
 import { PreBookBadge } from "@/components/wolverine/pre-book-badge"
 import { ItemCard } from "@/components/wolverine/item-card"
-import { mockItems } from "@/lib/data"
+import { type Item } from "@/lib/data"
 
 export default function ItemDetailPage() {
   const params = useParams()
-  const item = mockItems.find((i) => i.id === params.id)
-  
+
+  // TODO: Replace with real data fetching
+  const item: Item | undefined = undefined
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [preBookDate, setPreBookDate] = useState<Date | undefined>()
   const [preBookNotes, setPreBookNotes] = useState("")
   const [preBookOpen, setPreBookOpen] = useState(false)
   const [messageOpen, setMessageOpen] = useState(false)
   const [message, setMessage] = useState("")
-  
+
   if (!item) {
     notFound()
   }
-  
-  const similarItems = mockItems
-    .filter((i) => i.id !== item.id && i.category === item.category)
-    .slice(0, 4)
+
+  // TODO: Replace with real data fetching
+  const similarItems: Item[] = []
   
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % item.images.length)

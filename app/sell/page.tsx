@@ -64,9 +64,6 @@ export default function SellPage() {
   
   const [isDragging, setIsDragging] = useState(false)
 
-  // Suggested price (mock)
-  const suggestedPrice = 45
-
   const processFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files)
     const converted: { file: File; previewUrl: string }[] = []
@@ -373,19 +370,6 @@ export default function SellPage() {
                           />
                         </div>
                       </div>
-                      
-                      {title && category && (
-                        <div className="p-4 bg-muted/50 rounded-lg">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Sparkles className="w-4 h-4 text-maize" />
-                            <span className="font-medium">Suggested price based on demand:</span>
-                            <span className="font-bold">${suggestedPrice}</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Based on similar items in {category}
-                          </p>
-                        </div>
-                      )}
                       
                       <div className="flex items-center justify-between p-4 border rounded-lg">
                         <div>

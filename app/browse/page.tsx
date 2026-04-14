@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Badge } from "@/components/ui/badge"
 import { Search, SlidersHorizontal, X, Star } from "lucide-react"
 import { ItemCard } from "@/components/wolverine/item-card"
-import { mockItems, categories } from "@/lib/data"
+import { categories, type Item } from "@/lib/data"
 
 const conditions = ["New", "Like New", "Good", "Fair"]
 const pickupAreas = ["Central Campus", "North Campus", "Off-campus"]
@@ -41,8 +41,11 @@ function BrowsePageContent() {
   const [sortBy, setSortBy] = useState("newest")
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   
+  // TODO: Replace with real data fetching
+  const allItems: Item[] = []
+
   const filteredItems = useMemo(() => {
-    let items = [...mockItems]
+    let items = [...allItems]
     
     // Search query
     if (searchQuery) {
