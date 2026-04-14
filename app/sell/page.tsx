@@ -70,7 +70,7 @@ export default function SellPage() {
   const processFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"))
     if (imageFiles.length === 0) return
-    const newPhotos = imageFiles.map(() => "/placeholder.svg?height=400&width=400")
+    const newPhotos = imageFiles.map((file) => URL.createObjectURL(file))
     setPhotos((prev) => [...prev, ...newPhotos].slice(0, 6))
   }, [])
 
