@@ -12,7 +12,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Badge } from "@/components/ui/badge"
 import { Search, SlidersHorizontal, X, Star } from "lucide-react"
 import { ItemCard } from "@/components/wolverine/item-card"
-import { categories, type Item } from "@/lib/data"
+import { categories } from "@/lib/data"
+import { useListings } from "@/lib/listings-context"
 
 const conditions = ["New", "Like New", "Good", "Fair"]
 const pickupAreas = ["Central Campus", "North Campus", "Off-campus"]
@@ -41,11 +42,24 @@ function BrowsePageContent() {
   const [sortBy, setSortBy] = useState("newest")
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   
-  // TODO: Replace with real data fetching
-  const allItems: Item[] = []
+  const { getAllListings } = useListings()
+  const allListings = getAllListings()
 
   const filteredItems = useMemo(() => {
-    let items = [...allItems]
+    let items = allListings.map((l) => ({
+      id: l.id,
+      title: l.title,
+      description: l.description,
+      price: l.price,
+      condition: l.condition,
+      category: l.category,
+      images: l.images,
+      sellerId: l.sellerId,
+      sellerName: l.sellerName,
+      pickupLocation: l.pickupLocation,
+      preBookAvailable: l.preBookAvailable,
+      createdAt: l.createdAt,
+    }))
     
     // Search query
     if (searchQuery) {
@@ -70,7 +84,7 @@ function BrowsePageContent() {
     
     // Area filter
     if (selectedAreas.length > 0) {
-      items = items.filter((item) => selectedAreas.includes(item.pickupArea))
+      items = items.filter((item) => item.pickupArea && selectedAreas.includes(item.pickupArea))
     }
     
     // Price filter
@@ -85,7 +99,7 @@ function BrowsePageContent() {
     
     // Rating filter
     if (minRating > 0) {
-      items = items.filter((item) => item.sellerRating >= minRating)
+      items = items.filter((item) => (item.sellerRating ?? 0) >= minRating)
     }
     
     // Sort
@@ -97,7 +111,7 @@ function BrowsePageContent() {
         items.sort((a, b) => b.price - a.price)
         break
       case "popular":
-        items.sort((a, b) => b.sellerTransactions - a.sellerTransactions)
+        items.sort((a, b) => (b.sellerTransactions ?? 0) - (a.sellerTransactions ?? 0))
         break
       default:
         items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())

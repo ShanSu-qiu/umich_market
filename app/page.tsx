@@ -1,13 +1,53 @@
+"use client"
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Search, ArrowRight, Calendar, Package } from "lucide-react"
 import { SeasonalBanner } from "@/components/wolverine/seasonal-banner"
+import { ItemCard } from "@/components/wolverine/item-card"
 import { TrustIndicators } from "@/components/wolverine/trust-indicators"
 import { categories } from "@/lib/data"
+import { useListings } from "@/lib/listings-context"
 
 export default function HomePage() {
+  const { getAllListings } = useListings()
+  const allListings = getAllListings()
+
+  const featuredItems = allListings.slice(0, 6).map((l) => ({
+    id: l.id,
+    title: l.title,
+    description: l.description,
+    price: l.price,
+    condition: l.condition,
+    category: l.category,
+    images: l.images,
+    sellerId: l.sellerId,
+    sellerName: l.sellerName,
+    pickupLocation: l.pickupLocation,
+    preBookAvailable: l.preBookAvailable,
+    createdAt: l.createdAt,
+  }))
+
+  const preBookItems = allListings
+    .filter((l) => l.preBookAvailable)
+    .slice(0, 4)
+    .map((l) => ({
+      id: l.id,
+      title: l.title,
+      description: l.description,
+      price: l.price,
+      condition: l.condition,
+      category: l.category,
+      images: l.images,
+      sellerId: l.sellerId,
+      sellerName: l.sellerName,
+      pickupLocation: l.pickupLocation,
+      preBookAvailable: l.preBookAvailable,
+      createdAt: l.createdAt,
+    }))
+
   return (
     <div className="flex flex-col">
       {/* Hero Section with Seasonal Banner */}
@@ -62,18 +102,26 @@ export default function HomePage() {
             </Button>
           </div>
 
-          <div className="text-center py-16">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-              <Package className="w-8 h-8 text-muted-foreground" />
+          {featuredItems.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {featuredItems.map((item) => (
+                <ItemCard key={item.id} item={item} />
+              ))}
             </div>
-            <h3 className="font-semibold text-lg mb-2">No listings yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Be the first to list an item for Michigan students!
-            </p>
-            <Button asChild>
-              <Link href="/sell">Start Selling</Link>
-            </Button>
-          </div>
+          ) : (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                <Package className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2">No listings yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Be the first to list an item for Michigan students!
+              </p>
+              <Button asChild>
+                <Link href="/sell">Start Selling</Link>
+              </Button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -98,11 +146,19 @@ export default function HomePage() {
             </Button>
           </div>
 
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">
-              No pre-book items available yet. Check back soon!
-            </p>
-          </div>
+          {preBookItems.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {preBookItems.map((item) => (
+                <ItemCard key={item.id} item={item} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                No pre-book items available yet. Check back soon!
+              </p>
+            </div>
+          )}
         </div>
       </section>
 

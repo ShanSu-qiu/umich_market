@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { Header } from '@/components/wolverine/header'
 import { Footer } from '@/components/wolverine/footer'
 import { AuthProvider } from '@/lib/auth-context'
+import { ListingsProvider } from '@/lib/listings-context'
 import './globals.css'
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -29,11 +30,13 @@ export default function RootLayout({
     <html lang="en" className="bg-background">
       <body className={`${inter.variable} font-sans antialiased min-h-screen flex flex-col`}>
         <AuthProvider>
-          <Header />
-          <main className="flex-1">
-            {children}
-          </main>
-          <Footer />
+          <ListingsProvider>
+            <Header />
+            <main className="flex-1">
+              {children}
+            </main>
+            <Footer />
+          </ListingsProvider>
         </AuthProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

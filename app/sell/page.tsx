@@ -29,6 +29,8 @@ import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { CampusLocationPicker } from "@/components/wolverine/campus-location-picker"
 import { categories } from "@/lib/data"
+import { useAuth } from "@/lib/auth-context"
+import { useListings } from "@/lib/listings-context"
 
 const conditions = [
   { value: "New", description: "Brand new, never used" },
@@ -47,6 +49,8 @@ const steps = [
 
 export default function SellPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  const { addListing } = useListings()
   const [currentStep, setCurrentStep] = useState(1)
   
   // Form state
@@ -148,8 +152,25 @@ export default function SellPage() {
   }
   
   const handleSubmit = () => {
-    // In a real app, this would submit to an API
-    alert("Listing created successfully!")
+    if (!user) {
+      router.push("/login")
+      return
+    }
+
+    addListing({
+      title,
+      description,
+      price: Number(price),
+      condition,
+      category,
+      images: photos.map((p) => p.previewUrl),
+      sellerId: user.email,
+      sellerName: user.name,
+      sellerEmail: user.email,
+      pickupLocation,
+      preBookAvailable: enablePrebook,
+    })
+
     router.push("/dashboard")
   }
   

@@ -1,6 +1,5 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -16,11 +15,11 @@ export function ItemCard({ item }: ItemCardProps) {
     <Link href={`/item/${item.id}`}>
       <Card className="group overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1 h-full">
         <div className="relative aspect-square overflow-hidden bg-muted">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={item.images[0]}
             alt={item.title}
-            fill
-            className="object-cover transition-transform duration-200 group-hover:scale-105"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
           />
           {item.preBookAvailable && (
             <div className="absolute top-2 left-2">
@@ -45,10 +44,12 @@ export function ItemCard({ item }: ItemCardProps) {
             <p className="text-lg font-bold text-primary">${item.price}</p>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <span className="font-medium text-foreground">{item.sellerName}</span>
-              <span className="flex items-center gap-0.5">
-                <Star className="w-3 h-3 fill-maize text-maize" />
-                {item.sellerRating}
-              </span>
+              {item.sellerRating != null && (
+                <span className="flex items-center gap-0.5">
+                  <Star className="w-3 h-3 fill-maize text-maize" />
+                  {item.sellerRating}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="w-3 h-3" />

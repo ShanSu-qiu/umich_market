@@ -15,10 +15,14 @@ import {
   LogIn,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
+import { useListings } from "@/lib/listings-context"
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("listings")
   const { user, isLoading } = useAuth()
+  const { getMyListings } = useListings()
+  const myListings = user ? getMyListings(user.email) : []
+  const activeCount = myListings.filter((l) => l.status === "Active").length
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -128,7 +132,7 @@ export default function DashboardPage() {
                   <Package className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">0</p>
+                  <p className="text-2xl font-bold">{activeCount}</p>
                   <p className="text-sm text-muted-foreground">Active Listings</p>
                 </div>
               </div>
@@ -198,16 +202,57 @@ export default function DashboardPage() {
 
           {/* My Listings Tab */}
           <TabsContent value="listings" className="mt-6">
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Package className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-semibold mb-2">No listings yet</h3>
-                <p className="text-muted-foreground mb-4">Start selling to other Michigan students!</p>
-                <Button asChild>
-                  <Link href="/sell">Create Your First Listing</Link>
-                </Button>
-              </CardContent>
-            </Card>
+            {myListings.length > 0 ? (
+              <div className="space-y-4">
+                {myListings.map((listing) => (
+                  <Card key={listing.id}>
+                    <CardContent className="p-4">
+                      <div className="flex gap-4">
+                        <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden bg-muted shrink-0">
+                          {listing.images[0] ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={listing.images[0]}
+                              alt={listing.title}
+                              className="absolute inset-0 w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <Package className="w-8 h-8 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="font-semibold line-clamp-1">{listing.title}</p>
+                              <p className="text-lg font-bold text-primary">${listing.price}</p>
+                            </div>
+                            <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400">
+                              {listing.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {listing.category} &middot; {listing.condition} &middot; {listing.pickupLocation}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Package className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="font-semibold mb-2">No listings yet</h3>
+                  <p className="text-muted-foreground mb-4">Start selling to other Michigan students!</p>
+                  <Button asChild>
+                    <Link href="/sell">Create Your First Listing</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* My Purchases Tab */}

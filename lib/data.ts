@@ -3,17 +3,17 @@ export type Item = {
   title: string
   description: string
   price: number
-  condition: "New" | "Like New" | "Good" | "Fair"
+  condition: string
   category: string
   images: string[]
   sellerId: string
   sellerName: string
-  sellerRating: number
-  sellerTransactions: number
-  sellerMemberSince: string
-  sellerVerified: boolean
+  sellerRating?: number
+  sellerTransactions?: number
+  sellerMemberSince?: string
+  sellerVerified?: boolean
   pickupLocation: string
-  pickupArea: "Central Campus" | "North Campus" | "Off-campus"
+  pickupArea?: "Central Campus" | "North Campus" | "Off-campus"
   preBookAvailable: boolean
   createdAt: string
   demandIndicator?: {
