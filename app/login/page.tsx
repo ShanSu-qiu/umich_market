@@ -23,15 +23,18 @@ export default function LoginPage() {
     setError("")
 
     setIsLoading(true)
-    const result = await signIn(email, password)
-    setIsLoading(false)
-
-    if (result.error) {
-      setError(result.error)
-      return
+    try {
+      const result = await signIn(email, password)
+      if (result.error) {
+        setError(result.error)
+        setIsLoading(false)
+        return
+      }
+      router.push("/dashboard")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign in failed. Please try again.")
+      setIsLoading(false)
     }
-
-    router.push("/dashboard")
   }
 
   return (

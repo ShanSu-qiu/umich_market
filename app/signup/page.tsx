@@ -36,15 +36,18 @@ export default function SignupPage() {
     }
     
     setIsLoading(true)
-    const result = await signUp(name, email, password)
-    setIsLoading(false)
-
-    if (result.error) {
-      setError(result.error)
-      return
+    try {
+      const result = await signUp(name, email, password)
+      if (result.error) {
+        setError(result.error)
+        setIsLoading(false)
+        return
+      }
+      router.push("/dashboard")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign up failed. Please try again.")
+      setIsLoading(false)
     }
-
-    router.push("/dashboard")
   }
   
   const isValidEmail = email.includes("@") || email === ""
