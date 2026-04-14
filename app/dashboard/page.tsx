@@ -50,12 +50,17 @@ export default function DashboardPage() {
               <p className="text-muted-foreground">Sign in to view your profile</p>
             </div>
           </div>
-          <Button asChild className="bg-maize text-maize-foreground hover:bg-maize/90">
-            <Link href="/sell">
-              <Plus className="w-4 h-4 mr-2" />
-              List New Item
-            </Link>
-          </Button>
+          <div className="flex gap-3">
+            <Button asChild variant="outline">
+              <Link href="/login">Sign In</Link>
+            </Button>
+            <Button asChild className="bg-maize text-maize-foreground hover:bg-maize/90">
+              <Link href="/sell">
+                <Plus className="w-4 h-4 mr-2" />
+                List New Item
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}

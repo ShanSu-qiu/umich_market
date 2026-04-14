@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Package, Search, User, Menu, X, Plus } from "lucide-react"
+import { Package, Search, User, Menu, X, Plus, LogIn } from "lucide-react"
 import { useState } from "react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 
@@ -48,6 +48,12 @@ export function Header() {
                 <span className="sr-only">Search</span>
               </Link>
             </Button>
+            <Button variant="ghost" asChild className="hidden sm:flex text-sm font-medium">
+              <Link href="/login">
+                <LogIn className="w-4 h-4 mr-1.5" />
+                Sign In
+              </Link>
+            </Button>
             <Button asChild className="hidden sm:flex bg-maize text-maize-foreground hover:bg-maize/90">
               <Link href="/sell">
                 <Plus className="w-4 h-4 mr-1" />
@@ -55,7 +61,7 @@ export function Header() {
               </Link>
             </Button>
             <Button variant="ghost" size="icon" asChild>
-              <Link href="/dashboard">
+              <Link href="/login">
                 <User className="w-5 h-5" />
                 <span className="sr-only">Account</span>
               </Link>
