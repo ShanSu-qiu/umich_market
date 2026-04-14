@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -62,18 +62,40 @@ export default function SellPage() {
   const [availableFrom, setAvailableFrom] = useState<Date>()
   const [availableTo, setAvailableTo] = useState<Date>()
   
+  const [isDragging, setIsDragging] = useState(false)
+
   // Suggested price (mock)
   const suggestedPrice = 45
-  
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files) return
-    
-    // In a real app, you'd upload to a server
-    // For demo, we'll use placeholder URLs
-    const newPhotos = Array.from(files).map(() => "/placeholder.svg?height=400&width=400")
+
+  const processFiles = useCallback((files: FileList | File[]) => {
+    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"))
+    if (imageFiles.length === 0) return
+    const newPhotos = imageFiles.map(() => "/placeholder.svg?height=400&width=400")
     setPhotos((prev) => [...prev, ...newPhotos].slice(0, 6))
+  }, [])
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) processFiles(e.target.files)
   }
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    if (e.dataTransfer.files) processFiles(e.dataTransfer.files)
+  }, [processFiles])
   
   const removePhoto = (index: number) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index))
@@ -167,7 +189,15 @@ export default function SellPage() {
                       </p>
                     </div>
                     
-                    <div className="grid grid-cols-3 gap-3">
+                    <div
+                      className={cn(
+                        "grid grid-cols-3 gap-3 rounded-lg p-3 -m-3 transition-colors",
+                        isDragging && "bg-maize/10 ring-2 ring-maize ring-offset-2"
+                      )}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
                       {photos.map((photo, index) => (
                         <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
                           <Image
@@ -187,11 +217,18 @@ export default function SellPage() {
                           )}
                         </div>
                       ))}
-                      
+
                       {photos.length < 6 && (
-                        <label className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center cursor-pointer hover:border-muted-foreground/50 transition-colors">
-                          <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                          <span className="text-sm text-muted-foreground">Add Photo</span>
+                        <label className={cn(
+                          "aspect-square rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors",
+                          isDragging
+                            ? "border-maize bg-maize/5 text-maize"
+                            : "border-muted-foreground/30 hover:border-muted-foreground/50"
+                        )}>
+                          <Upload className={cn("w-8 h-8 mb-2", isDragging ? "text-maize" : "text-muted-foreground")} />
+                          <span className={cn("text-sm", isDragging ? "text-maize font-medium" : "text-muted-foreground")}>
+                            {isDragging ? "Drop here" : "Add Photo"}
+                          </span>
                           <input
                             type="file"
                             accept="image/*"
