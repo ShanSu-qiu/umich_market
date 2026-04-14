@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useListings } from "@/lib/listings-context"
-import { uploadListingImage } from "@/lib/supabase/storage"
+import { uploadListingImages } from "@/lib/supabase/storage"
 import { ListingForm, type ListingFormData } from "@/components/wolverine/listing-form"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -129,16 +129,11 @@ export default function EditListingPage() {
     if (!user) return
     setIsSubmitting(true)
     try {
-      // Upload new photos (those with a File), keep existing URLs
-      const imageUrls: string[] = []
-      for (const photo of data.photos) {
-        if (photo.file) {
-          const url = await uploadListingImage(photo.file, user.id)
-          imageUrls.push(url)
-        } else {
-          imageUrls.push(photo.previewUrl)
-        }
-      }
+      // Upload new photos, keep existing URLs
+      const newFiles = data.photos.filter((p) => p.file).map((p) => p.file)
+      const uploadedUrls = await uploadListingImages(newFiles, user.id)
+      const existingUrls = data.photos.filter((p) => !p.file).map((p) => p.previewUrl)
+      const imageUrls = [...existingUrls, ...uploadedUrls]
 
       await updateListing(listingId, {
         title: data.title,

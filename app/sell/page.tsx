@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useListings } from "@/lib/listings-context"
-import { uploadListingImage } from "@/lib/supabase/storage"
+import { uploadListingImages } from "@/lib/supabase/storage"
 import { ListingForm, type ListingFormData } from "@/components/wolverine/listing-form"
 
 export default function SellPage() {
@@ -25,16 +25,14 @@ export default function SellPage() {
 
     try {
       // Upload photos to Supabase Storage
-      const imageUrls: string[] = []
-      for (const photo of data.photos) {
-        if (photo.file) {
-          const url = await uploadListingImage(photo.file, user.id)
-          imageUrls.push(url)
-        } else if (photo.previewUrl) {
-          // Existing URL (e.g. from edit)
-          imageUrls.push(photo.previewUrl)
-        }
-      }
+      const files = data.photos.map((p) => p.file)
+      const uploadedUrls = await uploadListingImages(files, user.id)
+
+      // Include any existing URLs (from edit flow)
+      const existingUrls = data.photos
+        .filter((p) => !p.file && p.previewUrl)
+        .map((p) => p.previewUrl)
+      const imageUrls = [...uploadedUrls, ...existingUrls]
 
       if (imageUrls.length === 0) {
         setError("Please upload at least one photo")

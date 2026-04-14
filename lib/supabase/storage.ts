@@ -1,22 +1,33 @@
 import { createClient } from "./client"
 
-export async function uploadListingImage(
-  file: File,
+export async function uploadListingImages(
+  files: (File | null)[],
   userId: string
-): Promise<string> {
+): Promise<string[]> {
   const supabase = createClient()
-  const fileExt = file.name.split(".").pop() || "jpg"
-  const fileName = `${userId}/${crypto.randomUUID()}.${fileExt}`
+  const urls: string[] = []
 
-  const { error } = await supabase.storage
-    .from("listing-images")
-    .upload(fileName, file)
+  for (const file of files) {
+    if (!file) continue
 
-  if (error) throw error
+    const fileExt = file.name.split(".").pop() || "jpg"
+    const fileName = `${userId}/${crypto.randomUUID()}.${fileExt}`
 
-  const { data } = supabase.storage
-    .from("listing-images")
-    .getPublicUrl(fileName)
+    const { error } = await supabase.storage
+      .from("listing-images")
+      .upload(fileName, file, { upsert: true })
 
-  return data.publicUrl
+    if (error) {
+      console.error("Upload failed for file:", file.name, error)
+      throw error
+    }
+
+    const { data } = supabase.storage
+      .from("listing-images")
+      .getPublicUrl(fileName)
+
+    urls.push(data.publicUrl)
+  }
+
+  return urls
 }
