@@ -47,7 +47,13 @@ export function ListingsProvider({ children }: { children: React.ReactNode }) {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
-        setListings(JSON.parse(stored))
+        const parsed: Listing[] = JSON.parse(stored)
+        // Clean out listings with dead blob: URLs
+        const valid = parsed.map((l) => ({
+          ...l,
+          images: l.images.filter((url) => !url.startsWith("blob:")),
+        })).filter((l) => l.images.length > 0)
+        setListings(valid)
       }
     } catch {}
     setLoaded(true)
@@ -55,7 +61,11 @@ export function ListingsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loaded) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(listings))
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(listings))
+      } catch (e) {
+        console.error("Failed to save listings to localStorage (likely exceeded size limit):", e)
+      }
     }
   }, [listings, loaded])
 
