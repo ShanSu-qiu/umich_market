@@ -20,8 +20,8 @@ export function Header() {
     { href: "/dashboard", label: "Dashboard" },
   ]
 
-  const handleSignOut = () => {
-    signOut()
+  const handleSignOut = async () => {
+    await signOut()
     router.push("/")
   }
 

@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/auth-context"
 
 export default function SignupPage() {
   const router = useRouter()
-  const { signIn } = useAuth()
+  const { signUp } = useAuth()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -41,12 +41,14 @@ export default function SignupPage() {
     }
     
     setIsLoading(true)
-    
-    // Simulate signup
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    const result = await signUp(name, email, password)
+    setIsLoading(false)
 
-    // Store auth state
-    signIn({ name, email })
+    if (result.error) {
+      setError(result.error)
+      return
+    }
+
     router.push("/dashboard")
   }
   

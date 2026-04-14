@@ -1,8 +1,11 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 
 export type AuthUser = {
+  id: string
   name: string
   email: string
 }
@@ -10,45 +13,99 @@ export type AuthUser = {
 type AuthContextType = {
   user: AuthUser | null
   isLoading: boolean
-  signIn: (user: AuthUser) => void
-  signOut: () => void
+  signIn: (email: string, password: string) => Promise<{ error?: string }>
+  signUp: (name: string, email: string, password: string) => Promise<{ error?: string }>
+  signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
-  signIn: () => {},
-  signOut: () => {},
+  signIn: async () => ({}),
+  signUp: async () => ({}),
+  signOut: async () => {},
 })
 
-const STORAGE_KEY = "wolverine_market_user"
+function mapUser(supabaseUser: User, displayName?: string): AuthUser {
+  return {
+    id: supabaseUser.id,
+    name: displayName || supabaseUser.user_metadata?.name || supabaseUser.email?.split("@")[0] || "User",
+    email: supabaseUser.email || "",
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const supabase = createClient()
+
+  // Fetch profile display_name from profiles table
+  const fetchProfile = useCallback(async (supabaseUser: User): Promise<AuthUser> => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", supabaseUser.id)
+      .single()
+    return mapUser(supabaseUser, data?.display_name)
+  }, [supabase])
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        setUser(JSON.parse(stored))
+    // Initial session check
+    const init = async () => {
+      const { data: { user: supabaseUser } } = await supabase.auth.getUser()
+      if (supabaseUser) {
+        const authUser = await fetchProfile(supabaseUser)
+        setUser(authUser)
       }
-    } catch {}
-    setIsLoading(false)
-  }, [])
+      setIsLoading(false)
+    }
+    init()
 
-  const signIn = useCallback((userData: AuthUser) => {
-    setUser(userData)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(userData))
-  }, [])
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          const authUser = await fetchProfile(session.user)
+          setUser(authUser)
+        } else {
+          setUser(null)
+        }
+        setIsLoading(false)
+      }
+    )
 
-  const signOut = useCallback(() => {
+    return () => subscription.unsubscribe()
+  }, [supabase, fetchProfile])
+
+  const signIn = useCallback(async (email: string, password: string): Promise<{ error?: string }> => {
+    if (!email.endsWith("@umich.edu")) {
+      return { error: "Please use your @umich.edu email address" }
+    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return { error: error.message }
+    return {}
+  }, [supabase])
+
+  const signUp = useCallback(async (name: string, email: string, password: string): Promise<{ error?: string }> => {
+    if (!email.endsWith("@umich.edu")) {
+      return { error: "Please use your @umich.edu email address" }
+    }
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name } },
+    })
+    if (error) return { error: error.message }
+    return {}
+  }, [supabase])
+
+  const signOutFn = useCallback(async () => {
+    await supabase.auth.signOut()
     setUser(null)
-    localStorage.removeItem(STORAGE_KEY)
-  }, [])
+  }, [supabase])
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, isLoading, signIn, signUp, signOut: signOutFn }}>
       {children}
     </AuthContext.Provider>
   )

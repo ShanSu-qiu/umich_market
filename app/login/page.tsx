@@ -17,27 +17,28 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-    
+
     if (!email.endsWith("@umich.edu")) {
       setError("Please use your @umich.edu email address")
       return
     }
-    
-    setIsLoading(true)
-    
-    // Simulate login
-    await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    // Store auth state
-    const name = email.split("@")[0].replace(/\./g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-    signIn({ name, email })
+    setIsLoading(true)
+    const result = await signIn(email, password)
+    setIsLoading(false)
+
+    if (result.error) {
+      setError(result.error)
+      return
+    }
+
     router.push("/dashboard")
   }
-  
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md">
@@ -67,7 +68,7 @@ export default function LoginPage() {
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
@@ -88,17 +89,17 @@ export default function LoginPage() {
                 />
               </div>
             </div>
-            
+
             {error && (
               <p className="text-sm text-destructive">{error}</p>
             )}
-            
+
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Signing in..." : "Sign in"}
               {!isLoading && <ArrowRight className="w-4 h-4 ml-2" />}
             </Button>
           </form>
-          
+
           <div className="mt-6 text-center text-sm">
             <span className="text-muted-foreground">Don&apos;t have an account? </span>
             <Link href="/signup" className="text-primary hover:underline font-medium">

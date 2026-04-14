@@ -1,8 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useListings } from "@/lib/listings-context"
+import { uploadListingImage } from "@/lib/supabase/storage"
 import { ListingForm, type ListingFormData } from "@/components/wolverine/listing-form"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -71,7 +73,7 @@ export default function EditListingPage() {
   }
 
   // Authorization: only the seller can edit
-  if (listing.sellerEmail !== user.email) {
+  if (listing.sellerId !== user.id) {
     return (
       <div className="min-h-screen py-6 sm:py-8">
         <div className="mx-auto max-w-5xl px-4">
@@ -121,27 +123,46 @@ export default function EditListingPage() {
     photos: listing.images.map((url) => ({ file: null, previewUrl: url })),
   }
 
-  const handleSubmit = (data: ListingFormData) => {
-    updateListing(listingId, {
-      title: data.title,
-      description: data.description,
-      price: Number(data.price),
-      condition: data.condition,
-      category: data.category,
-      images: data.photos.map((p) => p.previewUrl),
-      pickupLocation: data.pickupLocation,
-      preBookAvailable: data.enablePrebook,
-      sellerName: user.name,
-    })
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-    router.push("/dashboard")
+  const handleSubmit = async (data: ListingFormData) => {
+    if (!user) return
+    setIsSubmitting(true)
+    try {
+      // Upload new photos (those with a File), keep existing URLs
+      const imageUrls: string[] = []
+      for (const photo of data.photos) {
+        if (photo.file) {
+          const url = await uploadListingImage(photo.file, user.id)
+          imageUrls.push(url)
+        } else {
+          imageUrls.push(photo.previewUrl)
+        }
+      }
+
+      await updateListing(listingId, {
+        title: data.title,
+        description: data.description,
+        price: Number(data.price),
+        condition: data.condition,
+        category: data.category,
+        images: imageUrls,
+        pickupLocation: data.pickupLocation,
+        preBookAvailable: data.enablePrebook,
+      })
+
+      router.push("/dashboard")
+    } catch (err) {
+      console.error("Failed to update listing:", err)
+      setIsSubmitting(false)
+    }
   }
 
   return (
     <ListingForm
       heading="Edit Listing"
       subtitle={`Editing "${listing.title}"`}
-      submitLabel="Save Changes"
+      submitLabel={isSubmitting ? "Saving..." : "Save Changes"}
       initialData={initialData}
       onSubmit={handleSubmit}
     />

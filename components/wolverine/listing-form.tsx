@@ -83,25 +83,6 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
 
   const [isDragging, setIsDragging] = useState(false)
 
-  const compressAndConvert = (file: File, maxWidth = 800, quality = 0.7): Promise<string> =>
-    new Promise((resolve) => {
-      const img = new window.Image()
-      img.onload = () => {
-        const canvas = document.createElement("canvas")
-        let { width, height } = img
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width)
-          width = maxWidth
-        }
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext("2d")!
-        ctx.drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL("image/jpeg", quality))
-      }
-      img.src = URL.createObjectURL(file)
-    })
-
   const processFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files)
     const converted: { file: File; previewUrl: string }[] = []
@@ -123,14 +104,12 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
             file.name.replace(/\.heic$/i, ".jpg").replace(/\.heif$/i, ".jpg"),
             { type: "image/jpeg" }
           )
-          const dataUrl = await compressAndConvert(jpegFile)
-          converted.push({ file: jpegFile, previewUrl: dataUrl })
+          converted.push({ file: jpegFile, previewUrl: URL.createObjectURL(jpegFile) })
         } catch (err) {
           console.error("HEIC conversion failed:", err)
         }
       } else if (file.type.startsWith("image/")) {
-        const dataUrl = await compressAndConvert(file)
-        converted.push({ file, previewUrl: dataUrl })
+        converted.push({ file, previewUrl: URL.createObjectURL(file) })
       }
     }
     setIsConverting(false)

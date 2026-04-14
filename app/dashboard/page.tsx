@@ -22,7 +22,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("listings")
   const { user, isLoading } = useAuth()
   const { getMyListings } = useListings()
-  const myListings = user ? getMyListings(user.email) : []
+  const myListings = getMyListings()
   const activeCount = myListings.filter((l) => l.status === "Active").length
 
   const getStatusBadge = (status: string) => {
