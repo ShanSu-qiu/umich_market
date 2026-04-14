@@ -12,6 +12,7 @@ export default function SellPage() {
   const { user } = useAuth()
   const { addListing } = useListings()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState("")
 
   const handleSubmit = async (data: ListingFormData) => {
     if (!user) {
@@ -20,6 +21,8 @@ export default function SellPage() {
     }
 
     setIsSubmitting(true)
+    setError("")
+
     try {
       // Upload photos to Supabase Storage
       const imageUrls: string[] = []
@@ -27,10 +30,19 @@ export default function SellPage() {
         if (photo.file) {
           const url = await uploadListingImage(photo.file, user.id)
           imageUrls.push(url)
+        } else if (photo.previewUrl) {
+          // Existing URL (e.g. from edit)
+          imageUrls.push(photo.previewUrl)
         }
       }
 
-      await addListing({
+      if (imageUrls.length === 0) {
+        setError("Please upload at least one photo")
+        setIsSubmitting(false)
+        return
+      }
+
+      const result = await addListing({
         title: data.title,
         description: data.description,
         price: Number(data.price),
@@ -41,19 +53,35 @@ export default function SellPage() {
         preBookAvailable: data.enablePrebook,
       })
 
+      if (!result) {
+        setError("Failed to create listing. Please try again.")
+        setIsSubmitting(false)
+        return
+      }
+
       router.push("/dashboard")
     } catch (err) {
       console.error("Failed to create listing:", err)
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
       setIsSubmitting(false)
     }
   }
 
   return (
-    <ListingForm
-      heading="List an Item"
-      subtitle="Reach thousands of verified Michigan students"
-      submitLabel={isSubmitting ? "Publishing..." : "Publish Listing"}
-      onSubmit={handleSubmit}
-    />
+    <div>
+      {error && (
+        <div className="mx-auto max-w-5xl px-4 pt-4">
+          <div className="p-4 bg-destructive/10 text-destructive rounded-lg text-sm">
+            {error}
+          </div>
+        </div>
+      )}
+      <ListingForm
+        heading="List an Item"
+        subtitle="Reach thousands of verified Michigan students"
+        submitLabel={isSubmitting ? "Publishing..." : "Publish Listing"}
+        onSubmit={handleSubmit}
+      />
+    </div>
   )
 }
