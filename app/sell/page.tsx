@@ -27,7 +27,6 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import heic2any from "heic2any"
 import { CampusLocationPicker } from "@/components/wolverine/campus-location-picker"
 import { categories } from "@/lib/data"
 
@@ -82,6 +81,7 @@ export default function SellPage() {
 
       if (isHeic) {
         try {
+          const heic2any = (await import("heic2any")).default
           const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 })
           const jpegFile = new File(
             [blob as Blob],
