@@ -30,9 +30,12 @@ export default function LoginPage() {
         setIsLoading(false)
         return
       }
+      // Use router.refresh() to ensure auth state propagates, then redirect
+      router.refresh()
       router.push("/dashboard")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed. Please try again.")
+    } finally {
       setIsLoading(false)
     }
   }

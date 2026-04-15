@@ -43,9 +43,11 @@ export default function SignupPage() {
         setIsLoading(false)
         return
       }
+      router.refresh()
       router.push("/dashboard")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign up failed. Please try again.")
+    } finally {
       setIsLoading(false)
     }
   }
