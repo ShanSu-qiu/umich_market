@@ -44,6 +44,7 @@ type ListingsContextType = {
     pickupLocation: string
     preBookAvailable: boolean
   }>) => Promise<boolean>
+  deleteListing: (listing: Listing) => Promise<boolean>
   getListingById: (id: string) => Listing | undefined
   getMyListings: () => Listing[]
   getAllListings: () => Listing[]
@@ -55,6 +56,7 @@ const ListingsContext = createContext<ListingsContextType>({
   isLoading: true,
   addListing: async () => null,
   updateListing: async () => false,
+  deleteListing: async () => false,
   getListingById: () => undefined,
   getMyListings: () => [],
   getAllListings: () => [],
@@ -192,6 +194,36 @@ export function ListingsProvider({ children }: { children: React.ReactNode }) {
     return true
   }, [supabase])
 
+  const deleteListing = useCallback(async (listing: Listing): Promise<boolean> => {
+    // Delete images from storage
+    if (listing.images?.length > 0) {
+      const paths = listing.images
+        .map((url) => {
+          const parts = url.split("/listing-images/")
+          return parts[1]
+        })
+        .filter(Boolean)
+      if (paths.length > 0) {
+        await supabase.storage.from("listing-images").remove(paths)
+      }
+    }
+
+    // Delete listing from database
+    const { error } = await supabase
+      .from("listings")
+      .delete()
+      .eq("id", listing.id)
+
+    if (error) {
+      console.error("Failed to delete listing:", error)
+      return false
+    }
+
+    // Optimistic update
+    setListings((prev) => prev.filter((l) => l.id !== listing.id))
+    return true
+  }, [supabase])
+
   const getListingById = useCallback((id: string) => {
     return listings.find((l) => l.id === id)
   }, [listings])
@@ -211,6 +243,7 @@ export function ListingsProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       addListing,
       updateListing,
+      deleteListing,
       getListingById,
       getMyListings,
       getAllListings,

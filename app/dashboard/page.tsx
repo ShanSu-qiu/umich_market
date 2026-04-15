@@ -14,6 +14,7 @@ import {
   Plus,
   LogIn,
   Pencil,
+  Trash2,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useListings } from "@/lib/listings-context"
@@ -21,7 +22,7 @@ import { useListings } from "@/lib/listings-context"
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("listings")
   const { user, isLoading } = useAuth()
-  const { getMyListings } = useListings()
+  const { getMyListings, deleteListing } = useListings()
   const myListings = getMyListings()
   const activeCount = myListings.filter((l) => l.status === "Active").length
 
@@ -239,6 +240,16 @@ export default function DashboardPage() {
                                   Edit
                                 </Link>
                               )}
+                              <button
+                                onClick={async () => {
+                                  if (!confirm("Are you sure you want to delete this listing?")) return
+                                  await deleteListing(listing)
+                                }}
+                                className="flex items-center gap-1 text-sm text-red-500 hover:text-red-700 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Delete
+                              </button>
                               <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400">
                                 {listing.status}
                               </Badge>
