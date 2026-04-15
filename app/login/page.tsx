@@ -26,13 +26,18 @@ function LoginContent() {
 
     setIsLoading(true)
     try {
-      const result = await signIn(email, password)
+      // Add timeout to prevent infinite hang
+      const timeoutPromise = new Promise<{ error: string }>((resolve) =>
+        setTimeout(() => resolve({ error: "Sign in timed out. Please try again." }), 10000)
+      )
+      const result = await Promise.race([signIn(email, password), timeoutPromise])
       if (result.error) {
         setError(result.error)
         setIsLoading(false)
         return
       }
-      router.refresh()
+      // Small delay to let auth state propagate
+      await new Promise((r) => setTimeout(r, 500))
       router.push(redirectTo)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed. Please try again.")

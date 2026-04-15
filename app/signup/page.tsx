@@ -39,13 +39,16 @@ function SignupContent() {
     
     setIsLoading(true)
     try {
-      const result = await signUp(name, email, password)
+      const timeoutPromise = new Promise<{ error: string }>((resolve) =>
+        setTimeout(() => resolve({ error: "Sign up timed out. Please try again." }), 10000)
+      )
+      const result = await Promise.race([signUp(name, email, password), timeoutPromise])
       if (result.error) {
         setError(result.error)
         setIsLoading(false)
         return
       }
-      router.refresh()
+      await new Promise((r) => setTimeout(r, 500))
       router.push(redirectTo)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign up failed. Please try again.")
