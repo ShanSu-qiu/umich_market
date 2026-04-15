@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,8 +11,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Package, Mail, Lock, User, ArrowRight, HelpCircle, ShieldCheck, Star, Users } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
-export default function SignupPage() {
+function SignupContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get("redirect") || "/dashboard"
   const { signUp } = useAuth()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -44,7 +46,7 @@ export default function SignupPage() {
         return
       }
       router.refresh()
-      router.push("/dashboard")
+      router.push(redirectTo)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign up failed. Please try again.")
     } finally {
@@ -225,7 +227,7 @@ export default function SignupPage() {
             
             <div className="mt-6 text-center text-sm">
               <span className="text-muted-foreground">Already have an account? </span>
-              <Link href="/login" className="text-primary hover:underline font-medium">
+              <Link href={`/login?redirect=${encodeURIComponent(redirectTo)}`} className="text-primary hover:underline font-medium">
                 Sign in
               </Link>
             </div>
@@ -233,5 +235,13 @@ export default function SignupPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupContent />
+    </Suspense>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useListings } from "@/lib/listings-context"
@@ -9,16 +9,24 @@ import { ListingForm, type ListingFormData } from "@/components/wolverine/listin
 
 export default function SellPage() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, isLoading } = useAuth()
   const { addListing } = useListings()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
 
-  const handleSubmit = async (data: ListingFormData) => {
-    if (!user) {
-      router.push("/login")
-      return
+  // Redirect unauthenticated users to login (with return URL)
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/login?redirect=/sell")
     }
+  }, [isLoading, user, router])
+
+  // Show nothing while checking auth
+  if (isLoading || !user) {
+    return null
+  }
+
+  const handleSubmit = async (data: ListingFormData) => {
 
     setIsSubmitting(true)
     setError("")

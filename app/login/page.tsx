@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,8 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Package, Mail, Lock, ArrowRight } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get("redirect") || "/dashboard"
   const { signIn } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -30,9 +32,8 @@ export default function LoginPage() {
         setIsLoading(false)
         return
       }
-      // Use router.refresh() to ensure auth state propagates, then redirect
       router.refresh()
-      router.push("/dashboard")
+      router.push(redirectTo)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed. Please try again.")
     } finally {
@@ -103,12 +104,20 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center text-sm">
             <span className="text-muted-foreground">Don&apos;t have an account? </span>
-            <Link href="/signup" className="text-primary hover:underline font-medium">
+            <Link href={`/signup?redirect=${encodeURIComponent(redirectTo)}`} className="text-primary hover:underline font-medium">
               Sign up
             </Link>
           </div>
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   )
 }
