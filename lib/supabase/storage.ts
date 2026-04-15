@@ -13,13 +13,26 @@ export async function uploadListingImages(
     const fileExt = file.name.split(".").pop() || "jpg"
     const fileName = `${userId}/${crypto.randomUUID()}.${fileExt}`
 
-    const { error } = await supabase.storage
-      .from("listing-images")
-      .upload(fileName, file, { upsert: true })
+    // Retry up to 3 times to handle lock conflicts
+    let lastError: unknown = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { error } = await supabase.storage
+        .from("listing-images")
+        .upload(fileName, file, { upsert: true })
 
-    if (error) {
-      console.error("Upload failed for file:", file.name, error)
-      throw error
+      if (!error) {
+        lastError = null
+        break
+      }
+
+      lastError = error
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)))
+      }
+    }
+
+    if (lastError) {
+      throw lastError
     }
 
     const { data } = supabase.storage
