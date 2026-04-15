@@ -55,13 +55,8 @@ export default function SignupPage() {
         return
       }
 
-      if (data.session) {
-        router.push(redirectTo)
-        router.refresh()
-      } else {
-        // Email confirmation may be required
-        router.push("/login?redirect=" + encodeURIComponent(redirectTo))
-      }
+      // Hard redirect to ensure full page reload with session
+      window.location.href = redirectTo
     } catch (err) {
       setError("Something went wrong. Please try again.")
     } finally {

@@ -37,10 +37,9 @@ function LoginForm() {
         return
       }
 
-      // No error means login succeeded — redirect immediately
+      // No error means login succeeded — hard redirect to ensure full page reload with session
       const redirectTo = searchParams.get("redirect") || "/dashboard"
-      router.push(redirectTo)
-      router.refresh()
+      window.location.href = redirectTo
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.")
       setLoading(false)
