@@ -61,7 +61,7 @@ interface ListingFormProps {
   subtitle: string
   submitLabel: string
   initialData?: ListingFormData
-  onSubmit: (data: ListingFormData) => void
+  onSubmit: (data: ListingFormData) => void | Promise<void>
 }
 
 export function ListingForm({ heading, subtitle, submitLabel, initialData, onSubmit }: ListingFormProps) {
@@ -162,17 +162,28 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
     }
   }
 
-  const handleFormSubmit = () => {
-    onSubmit({
-      title,
-      description,
-      category,
-      condition,
-      price,
-      enablePrebook,
-      pickupLocation,
-      photos,
-    })
+  const [formError, setFormError] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleFormSubmit = async () => {
+    setFormError("")
+    setSubmitting(true)
+    try {
+      await onSubmit({
+        title,
+        description,
+        category,
+        condition,
+        price,
+        enablePrebook,
+        pickupLocation,
+        photos,
+      })
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -516,13 +527,19 @@ export function ListingForm({ heading, subtitle, submitLabel, initialData, onSub
                   ) : (
                     <Button
                       onClick={handleFormSubmit}
-                      disabled={!canProceed()}
+                      disabled={!canProceed() || submitting}
                       className="bg-maize text-maize-foreground hover:bg-maize/90"
                     >
-                      {submitLabel}
+                      {submitting ? "Saving..." : submitLabel}
                     </Button>
                   )}
                 </div>
+
+                {formError && (
+                  <div className="mt-4 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
+                    {formError}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
