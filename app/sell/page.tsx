@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useListings } from "@/lib/listings-context"
 import { uploadListingImages } from "@/lib/supabase/storage"
@@ -8,37 +8,38 @@ import { ListingForm, type ListingFormData } from "@/components/wolverine/listin
 
 const DRAFT_KEY = "sell_draft"
 
+function readDraft(): ListingFormData | undefined {
+  if (typeof window === "undefined") return undefined
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY)
+    if (!raw) return undefined
+    const saved = JSON.parse(raw)
+    sessionStorage.removeItem(DRAFT_KEY)
+    return {
+      title: saved.title || "",
+      description: saved.description || "",
+      price: saved.price || "",
+      category: saved.category || "",
+      condition: saved.condition || "",
+      pickupLocation: saved.pickupLocation || "",
+      enablePrebook: saved.enablePrebook || false,
+      photos: [],
+    }
+  } catch {
+    sessionStorage.removeItem(DRAFT_KEY)
+    return undefined
+  }
+}
+
 export default function SellPage() {
   const { user } = useAuth()
   const { addListing } = useListings()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
-  const [draftRestored, setDraftRestored] = useState(false)
-  const [initialData, setInitialData] = useState<ListingFormData | undefined>(undefined)
 
-  // Restore draft from sessionStorage on mount
-  useEffect(() => {
-    try {
-      const draft = sessionStorage.getItem(DRAFT_KEY)
-      if (draft) {
-        const saved = JSON.parse(draft)
-        setInitialData({
-          title: saved.title || "",
-          description: saved.description || "",
-          price: saved.price || "",
-          category: saved.category || "",
-          condition: saved.condition || "",
-          pickupLocation: saved.pickupLocation || "",
-          enablePrebook: saved.enablePrebook || false,
-          photos: [], // Photos can't be serialized
-        })
-        setDraftRestored(true)
-        sessionStorage.removeItem(DRAFT_KEY)
-      }
-    } catch {
-      sessionStorage.removeItem(DRAFT_KEY)
-    }
-  }, [])
+  // Read draft synchronously on first render so it's available for ListingForm's initial useState
+  const restoredDraft = useMemo(() => readDraft(), [])
+  const [draftRestored] = useState(() => !!restoredDraft)
 
   const handleSubmit = async (data: ListingFormData) => {
     if (!user) {
@@ -121,7 +122,7 @@ export default function SellPage() {
         heading="List an Item"
         subtitle="Reach thousands of verified Michigan students"
         submitLabel={isSubmitting ? "Publishing..." : "Publish Listing"}
-        initialData={initialData}
+        initialData={restoredDraft}
         onSubmit={handleSubmit}
       />
     </div>
