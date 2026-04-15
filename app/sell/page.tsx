@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useListings } from "@/lib/listings-context"
 import { uploadListingImages } from "@/lib/supabase/storage"
@@ -13,17 +13,18 @@ export default function SellPage() {
   const { addListing } = useListings()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
+  const [draftRestored, setDraftRestored] = useState(false)
+  const [initialData, setInitialData] = useState<ListingFormData | undefined>(undefined)
+  const [formKey, setFormKey] = useState(0)
 
-  // Lazy initializer — runs once on client, reads draft synchronously before ListingForm mounts
-  const [restoredDraft] = useState<ListingFormData | undefined>(() => {
-    if (typeof window === "undefined") return undefined
+  // Restore draft after mount (client-only)
+  useEffect(() => {
+    const raw = sessionStorage.getItem(DRAFT_KEY)
+    if (!raw) return
+
     try {
-      const raw = sessionStorage.getItem(DRAFT_KEY)
-      if (!raw) return undefined
       const saved = JSON.parse(raw)
-      sessionStorage.removeItem(DRAFT_KEY)
-      console.log("Restoring draft:", saved)
-      return {
+      setInitialData({
         title: saved.title || "",
         description: saved.description || "",
         price: saved.price || "",
@@ -32,19 +33,19 @@ export default function SellPage() {
         pickupLocation: saved.pickupLocation || "",
         enablePrebook: saved.enablePrebook || false,
         photos: [],
-      }
+      })
+      sessionStorage.removeItem(DRAFT_KEY)
+      setDraftRestored(true)
+      setFormKey((k) => k + 1) // Force ListingForm to re-mount with new initialData
     } catch {
       sessionStorage.removeItem(DRAFT_KEY)
-      return undefined
     }
-  })
-
-  const draftRestored = !!restoredDraft
+  }, [])
 
   const handleSubmit = async (data: ListingFormData) => {
     if (!user) {
       // Save draft before redirecting to login
-      const draft = {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
         title: data.title,
         description: data.description,
         price: data.price,
@@ -52,10 +53,7 @@ export default function SellPage() {
         condition: data.condition,
         pickupLocation: data.pickupLocation,
         enablePrebook: data.enablePrebook,
-      }
-      console.log("Saving draft before redirect:", draft)
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
-      console.log("Draft saved:", sessionStorage.getItem(DRAFT_KEY))
+      }))
       window.location.href = "/login?redirect=/sell"
       return
     }
@@ -120,10 +118,11 @@ export default function SellPage() {
         </div>
       )}
       <ListingForm
+        key={formKey}
         heading="List an Item"
         subtitle="Reach thousands of verified Michigan students"
         submitLabel={isSubmitting ? "Publishing..." : "Publish Listing"}
-        initialData={restoredDraft}
+        initialData={initialData}
         onSubmit={handleSubmit}
       />
     </div>

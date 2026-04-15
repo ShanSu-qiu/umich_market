@@ -5,6 +5,13 @@ export async function uploadListingImages(
   userId: string
 ): Promise<string[]> {
   const supabase = createClient()
+
+  // Verify we have a session before uploading
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    throw new Error("Not authenticated. Please sign in and try again.")
+  }
+
   const urls: string[] = []
 
   for (const file of files) {
