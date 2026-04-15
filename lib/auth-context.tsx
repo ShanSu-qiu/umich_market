@@ -22,10 +22,10 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 })
 
-function toAuthUser(supabaseUser: User, displayName?: string | null): AuthUser {
+function toAuthUser(supabaseUser: User): AuthUser {
   return {
     id: supabaseUser.id,
-    name: displayName || supabaseUser.user_metadata?.name || supabaseUser.email?.split("@")[0] || "User",
+    name: supabaseUser.user_metadata?.name || supabaseUser.email?.split("@")[0] || "User",
     email: supabaseUser.email || "",
   }
 }
@@ -35,39 +35,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const supabase = useMemo(() => createClient(), [])
 
-  const fetchDisplayName = useCallback(async (supabaseUser: User): Promise<string | null> => {
-    try {
-      const { data } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("id", supabaseUser.id)
-        .single()
-      return data?.display_name || null
-    } catch {
-      return null
-    }
-  }, [supabase])
-
   useEffect(() => {
-    const init = async () => {
-      try {
-        const { data: { user: supabaseUser } } = await supabase.auth.getUser()
-        if (supabaseUser) {
-          const displayName = await fetchDisplayName(supabaseUser)
-          setUser(toAuthUser(supabaseUser, displayName))
-        }
-      } catch (err) {
-        console.error("Auth init failed:", err)
+    // Initial check — get current user
+    supabase.auth.getUser().then(({ data: { user: supabaseUser } }) => {
+      if (supabaseUser) {
+        setUser(toAuthUser(supabaseUser))
       }
       setIsLoading(false)
-    }
-    init()
+    })
 
+    // Listen for auth changes — keep it synchronous and lightweight
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         if (session?.user) {
-          const displayName = await fetchDisplayName(session.user)
-          setUser(toAuthUser(session.user, displayName))
+          setUser(toAuthUser(session.user))
         } else {
           setUser(null)
         }
@@ -75,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
 
     return () => subscription.unsubscribe()
-  }, [supabase, fetchDisplayName])
+  }, [supabase])
 
   const signOutFn = useCallback(async () => {
     await supabase.auth.signOut()
