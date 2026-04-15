@@ -26,7 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 })
 
-function mapUser(supabaseUser: User, displayName?: string): AuthUser {
+function toAuthUser(supabaseUser: User, displayName?: string | null): AuthUser {
   return {
     id: supabaseUser.id,
     name: displayName || supabaseUser.user_metadata?.name || supabaseUser.email?.split("@")[0] || "User",
@@ -34,84 +34,103 @@ function mapUser(supabaseUser: User, displayName?: string): AuthUser {
   }
 }
 
-function getClient(): SupabaseClient {
-  return createClient()
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const clientRef = useRef<SupabaseClient | null>(null)
 
-  // Lazily get the Supabase client (only on client side)
   const getSupabase = useCallback(() => {
     if (!clientRef.current) {
-      clientRef.current = getClient()
+      clientRef.current = createClient()
     }
     return clientRef.current
   }, [])
 
-  const fetchProfile = useCallback(async (supabaseUser: User): Promise<AuthUser> => {
-    const supabase = getSupabase()
-    const { data } = await supabase
-      .from("profiles")
-      .select("display_name")
-      .eq("id", supabaseUser.id)
-      .single()
-    return mapUser(supabaseUser, data?.display_name)
+  const fetchDisplayName = useCallback(async (supabaseUser: User): Promise<string | null> => {
+    try {
+      const supabase = getSupabase()
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", supabaseUser.id)
+        .single()
+      return data?.display_name || null
+    } catch {
+      return null
+    }
   }, [getSupabase])
 
   useEffect(() => {
     const supabase = getSupabase()
 
-    // Initial session check
     const init = async () => {
-      const { data: { user: supabaseUser } } = await supabase.auth.getUser()
-      if (supabaseUser) {
-        const authUser = await fetchProfile(supabaseUser)
-        setUser(authUser)
+      try {
+        const { data: { user: supabaseUser } } = await supabase.auth.getUser()
+        if (supabaseUser) {
+          const displayName = await fetchDisplayName(supabaseUser)
+          setUser(toAuthUser(supabaseUser, displayName))
+        }
+      } catch (err) {
+        console.error("Auth init failed:", err)
       }
       setIsLoading(false)
     }
     init()
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         if (session?.user) {
-          const authUser = await fetchProfile(session.user)
-          setUser(authUser)
+          const displayName = await fetchDisplayName(session.user)
+          setUser(toAuthUser(session.user, displayName))
         } else {
           setUser(null)
         }
-        setIsLoading(false)
       }
     )
 
     return () => subscription.unsubscribe()
-  }, [getSupabase, fetchProfile])
+  }, [getSupabase, fetchDisplayName])
 
   const signIn = useCallback(async (email: string, password: string): Promise<{ error?: string }> => {
-    const supabase = getSupabase()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) return { error: error.message }
-    return {}
-  }, [getSupabase])
+    try {
+      const supabase = getSupabase()
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) return { error: error.message }
+      if (data.user) {
+        const displayName = await fetchDisplayName(data.user)
+        setUser(toAuthUser(data.user, displayName))
+      }
+      return {}
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Sign in failed" }
+    }
+  }, [getSupabase, fetchDisplayName])
 
   const signUp = useCallback(async (name: string, email: string, password: string): Promise<{ error?: string }> => {
-    const supabase = getSupabase()
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
-    })
-    if (error) return { error: error.message }
-    return {}
-  }, [getSupabase])
+    try {
+      const supabase = getSupabase()
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name } },
+      })
+      if (error) return { error: error.message }
+      // If email confirmation is enabled, user won't have a session yet
+      if (data.user && data.session) {
+        const displayName = await fetchDisplayName(data.user)
+        setUser(toAuthUser(data.user, displayName))
+      }
+      return {}
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Sign up failed" }
+    }
+  }, [getSupabase, fetchDisplayName])
 
   const signOutFn = useCallback(async () => {
-    const supabase = getSupabase()
-    await supabase.auth.signOut()
+    try {
+      const supabase = getSupabase()
+      await supabase.auth.signOut()
+    } catch {}
     setUser(null)
   }, [getSupabase])
 
