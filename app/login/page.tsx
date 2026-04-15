@@ -37,14 +37,10 @@ function LoginForm() {
         return
       }
 
-      if (data.session) {
-        const redirectTo = searchParams.get("redirect") || "/dashboard"
-        router.push(redirectTo)
-        router.refresh()
-      } else {
-        setError("No session returned. Please try again.")
-        setLoading(false)
-      }
+      // No error means login succeeded — redirect immediately
+      const redirectTo = searchParams.get("redirect") || "/dashboard"
+      router.push(redirectTo)
+      router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.")
       setLoading(false)
