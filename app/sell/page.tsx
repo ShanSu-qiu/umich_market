@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useListings } from "@/lib/listings-context"
 import { uploadListingImages } from "@/lib/supabase/storage"
@@ -8,53 +8,54 @@ import { ListingForm, type ListingFormData } from "@/components/wolverine/listin
 
 const DRAFT_KEY = "sell_draft"
 
-function readDraft(): ListingFormData | undefined {
-  if (typeof window === "undefined") return undefined
-  try {
-    const raw = sessionStorage.getItem(DRAFT_KEY)
-    if (!raw) return undefined
-    const saved = JSON.parse(raw)
-    sessionStorage.removeItem(DRAFT_KEY)
-    return {
-      title: saved.title || "",
-      description: saved.description || "",
-      price: saved.price || "",
-      category: saved.category || "",
-      condition: saved.condition || "",
-      pickupLocation: saved.pickupLocation || "",
-      enablePrebook: saved.enablePrebook || false,
-      photos: [],
-    }
-  } catch {
-    sessionStorage.removeItem(DRAFT_KEY)
-    return undefined
-  }
-}
-
 export default function SellPage() {
   const { user } = useAuth()
   const { addListing } = useListings()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
 
-  // Read draft synchronously on first render so it's available for ListingForm's initial useState
-  const restoredDraft = useMemo(() => readDraft(), [])
-  const [draftRestored] = useState(() => !!restoredDraft)
+  // Lazy initializer — runs once on client, reads draft synchronously before ListingForm mounts
+  const [restoredDraft] = useState<ListingFormData | undefined>(() => {
+    if (typeof window === "undefined") return undefined
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY)
+      if (!raw) return undefined
+      const saved = JSON.parse(raw)
+      sessionStorage.removeItem(DRAFT_KEY)
+      console.log("Restoring draft:", saved)
+      return {
+        title: saved.title || "",
+        description: saved.description || "",
+        price: saved.price || "",
+        category: saved.category || "",
+        condition: saved.condition || "",
+        pickupLocation: saved.pickupLocation || "",
+        enablePrebook: saved.enablePrebook || false,
+        photos: [],
+      }
+    } catch {
+      sessionStorage.removeItem(DRAFT_KEY)
+      return undefined
+    }
+  })
+
+  const draftRestored = !!restoredDraft
 
   const handleSubmit = async (data: ListingFormData) => {
     if (!user) {
       // Save draft before redirecting to login
-      try {
-        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
-          title: data.title,
-          description: data.description,
-          price: data.price,
-          category: data.category,
-          condition: data.condition,
-          pickupLocation: data.pickupLocation,
-          enablePrebook: data.enablePrebook,
-        }))
-      } catch {}
+      const draft = {
+        title: data.title,
+        description: data.description,
+        price: data.price,
+        category: data.category,
+        condition: data.condition,
+        pickupLocation: data.pickupLocation,
+        enablePrebook: data.enablePrebook,
+      }
+      console.log("Saving draft before redirect:", draft)
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+      console.log("Draft saved:", sessionStorage.getItem(DRAFT_KEY))
       window.location.href = "/login?redirect=/sell"
       return
     }
