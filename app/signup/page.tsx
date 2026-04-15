@@ -9,13 +9,12 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Package, Mail, Lock, User, ArrowRight, HelpCircle, ShieldCheck, Star, Users } from "lucide-react"
-import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase/client"
 
 function SignupContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get("redirect") || "/dashboard"
-  const { signUp } = useAuth()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -39,19 +38,27 @@ function SignupContent() {
     
     setIsLoading(true)
     try {
-      const timeoutPromise = new Promise<{ error: string }>((resolve) =>
-        setTimeout(() => resolve({ error: "Sign up timed out. Please try again." }), 10000)
-      )
-      const result = await Promise.race([signUp(name, email, password), timeoutPromise])
-      if (result.error) {
-        setError(result.error)
-        setIsLoading(false)
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name } },
+      })
+
+      if (error) {
+        setError(error.message)
         return
       }
-      await new Promise((r) => setTimeout(r, 500))
-      router.push(redirectTo)
+
+      if (data.session) {
+        router.push(redirectTo)
+        router.refresh()
+      } else {
+        // Email confirmation may be required
+        router.push("/login?redirect=" + encodeURIComponent(redirectTo))
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign up failed. Please try again.")
+      setError("Something went wrong. Please try again.")
     } finally {
       setIsLoading(false)
     }

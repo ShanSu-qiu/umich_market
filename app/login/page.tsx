@@ -8,13 +8,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Package, Mail, Lock, ArrowRight } from "lucide-react"
-import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase/client"
 
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get("redirect") || "/dashboard"
-  const { signIn } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -23,24 +22,26 @@ function LoginContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-
     setIsLoading(true)
+
     try {
-      // Add timeout to prevent infinite hang
-      const timeoutPromise = new Promise<{ error: string }>((resolve) =>
-        setTimeout(() => resolve({ error: "Sign in timed out. Please try again." }), 10000)
-      )
-      const result = await Promise.race([signIn(email, password), timeoutPromise])
-      if (result.error) {
-        setError(result.error)
-        setIsLoading(false)
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        setError(error.message)
         return
       }
-      // Small delay to let auth state propagate
-      await new Promise((r) => setTimeout(r, 500))
-      router.push(redirectTo)
+
+      if (data.session) {
+        router.push(redirectTo)
+        router.refresh()
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign in failed. Please try again.")
+      setError("Something went wrong. Please try again.")
     } finally {
       setIsLoading(false)
     }
