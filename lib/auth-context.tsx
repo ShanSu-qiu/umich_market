@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react"
+import { createContext, useContext, useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
@@ -22,11 +22,11 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 })
 
-function toAuthUser(supabaseUser: User): AuthUser {
+function toAuthUser(u: User): AuthUser {
   return {
-    id: supabaseUser.id,
-    name: supabaseUser.user_metadata?.name || supabaseUser.email?.split("@")[0] || "User",
-    email: supabaseUser.email || "",
+    id: u.id,
+    name: u.user_metadata?.name || u.email?.split("@")[0] || "User",
+    email: u.email || "",
   }
 }
 
@@ -36,35 +36,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
-    // Initial check — get current user
-    supabase.auth.getUser().then(({ data: { user: supabaseUser } }) => {
-      if (supabaseUser) {
-        setUser(toAuthUser(supabaseUser))
-      }
+    // Get initial session once
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      setUser(u ? toAuthUser(u) : null)
       setIsLoading(false)
     })
 
-    // Listen for auth changes — keep it synchronous and lightweight
+    // Listen for changes — no async calls inside callback
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        if (session?.user) {
-          setUser(toAuthUser(session.user))
-        } else {
-          setUser(null)
-        }
+        setUser(session?.user ? toAuthUser(session.user) : null)
+        setIsLoading(false)
       }
     )
 
     return () => subscription.unsubscribe()
   }, [supabase])
 
-  const signOutFn = useCallback(async () => {
+  const signOut = async () => {
     await supabase.auth.signOut()
     setUser(null)
-  }, [supabase])
+  }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, signOut: signOutFn }}>
+    <AuthContext.Provider value={{ user, isLoading, signOut }}>
       {children}
     </AuthContext.Provider>
   )
