@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,16 +11,21 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Package, Mail, Lock, User, ArrowRight, HelpCircle, ShieldCheck, Star, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
-function SignupContent() {
+export default function SignupPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const redirectTo = searchParams.get("redirect") || "/dashboard"
+  const [redirectTo, setRedirectTo] = useState("/dashboard")
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const redirect = params.get("redirect")
+    if (redirect) setRedirectTo(redirect)
+  }, [])
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -245,13 +250,5 @@ function SignupContent() {
         </Card>
       </div>
     </div>
-  )
-}
-
-export default function SignupPage() {
-  return (
-    <Suspense>
-      <SignupContent />
-    </Suspense>
   )
 }

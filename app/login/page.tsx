@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,14 +10,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Package, Mail, Lock, ArrowRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
-function LoginContent() {
+export default function LoginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const redirectTo = searchParams.get("redirect") || "/dashboard"
+  const [redirectTo, setRedirectTo] = useState("/dashboard")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+
+  // Read redirect param from URL on client side (avoids useSearchParams + Suspense)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const redirect = params.get("redirect")
+    if (redirect) setRedirectTo(redirect)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,13 +32,14 @@ function LoginContent() {
 
     try {
       const supabase = createClient()
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) {
-        setError(error.message)
+      if (authError) {
+        setError(authError.message)
+        setIsLoading(false)
         return
       }
 
@@ -40,7 +47,7 @@ function LoginContent() {
         router.push(redirectTo)
         router.refresh()
       }
-    } catch (err) {
+    } catch {
       setError("Something went wrong. Please try again.")
     } finally {
       setIsLoading(false)
@@ -117,13 +124,5 @@ function LoginContent() {
         </CardContent>
       </Card>
     </div>
-  )
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense>
-      <LoginContent />
-    </Suspense>
   )
 }
