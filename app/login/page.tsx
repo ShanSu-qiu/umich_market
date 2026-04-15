@@ -1,56 +1,71 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { createBrowserClient } from "@supabase/ssr"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Package, Mail, Lock, ArrowRight } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
-  const [redirectTo, setRedirectTo] = useState("/dashboard")
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-
-  // Read redirect param from URL on client side (avoids useSearchParams + Suspense)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const redirect = params.get("redirect")
-    if (redirect) setRedirectTo(redirect)
-  }, [])
+  const [debugInfo, setDebugInfo] = useState("")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading) return
+    setLoading(true)
     setError("")
-    setIsLoading(true)
+    setDebugInfo("Starting sign in...")
 
     try {
-      const supabase = createClient()
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      setDebugInfo(`URL: ${url ? url.substring(0, 30) + "..." : "NOT SET"}, Key: ${key ? "SET" : "NOT SET"}`)
+
+      if (!url || !key) {
+        setError("Supabase configuration missing. Please check environment variables.")
+        setLoading(false)
+        return
+      }
+
+      const supabase = createBrowserClient(url, key)
+
+      setDebugInfo("Calling signInWithPassword...")
+
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
+      setDebugInfo(`Result: ${authError ? authError.message : "success"}`)
+
       if (authError) {
         setError(authError.message)
-        setIsLoading(false)
+        setLoading(false)
         return
       }
 
       if (data.session) {
+        const redirectTo = searchParams.get("redirect") || "/dashboard"
         router.push(redirectTo)
         router.refresh()
+      } else {
+        setError("No session returned. Please try again.")
+        setLoading(false)
       }
-    } catch {
-      setError("Something went wrong. Please try again.")
-    } finally {
-      setIsLoading(false)
+    } catch (err) {
+      setError(`Error: ${err instanceof Error ? err.message : String(err)}`)
+      setLoading(false)
     }
   }
 
@@ -109,20 +124,32 @@ export default function LoginPage() {
               <p className="text-sm text-destructive">{error}</p>
             )}
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign in"}
-              {!isLoading && <ArrowRight className="w-4 h-4 ml-2" />}
+            {debugInfo && (
+              <p className="text-xs text-muted-foreground bg-muted p-2 rounded font-mono">{debugInfo}</p>
+            )}
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign in"}
+              {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
             </Button>
           </form>
 
           <div className="mt-6 text-center text-sm">
             <span className="text-muted-foreground">Don&apos;t have an account? </span>
-            <Link href={`/signup?redirect=${encodeURIComponent(redirectTo)}`} className="text-primary hover:underline font-medium">
+            <Link href="/signup" className="text-primary hover:underline font-medium">
               Sign up
             </Link>
           </div>
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   )
 }
