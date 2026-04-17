@@ -71,11 +71,11 @@ export default function DashboardPage() {
         setConvsLoading(false)
       })
 
-    // Fetch bookings (where user is seller)
+    // Fetch bookings for listings where user is seller
     supabase
       .from("bookings")
-      .select("*, listing:listings(title), buyer:profiles!buyer_id(display_name, email)")
-      .in("listing_id", myListings.map((l) => l.id).length > 0 ? myListings.map((l) => l.id) : ["00000000-0000-0000-0000-000000000000"])
+      .select("*, listing:listings!inner(title, seller_id), buyer:profiles!buyer_id(display_name, email)")
+      .eq("listing.seller_id", user.id)
       .order("created_at", { ascending: false })
       .then(({ data }) => setBookings(data || []))
 
@@ -87,7 +87,8 @@ export default function DashboardPage() {
       .order("created_at", { ascending: false })
       .limit(20)
       .then(({ data }) => setNotifications(data || []))
-  }, [user, supabase, myListings])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
