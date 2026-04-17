@@ -119,10 +119,10 @@ export function ChatModal({
 
   // Subscribe to real-time messages
   useEffect(() => {
-    if (!conversationId || !open) return
+    if (!conversationId) return
 
     const channel = supabase
-      .channel(`conversation:${conversationId}`)
+      .channel(`room:${conversationId}`)
       .on(
         "postgres_changes",
         {
@@ -134,27 +134,19 @@ export function ChatModal({
         (payload) => {
           const newMsg = payload.new as ChatMessage
           setMessages((prev) => {
-            // Avoid duplicates
             if (prev.some((m) => m.id === newMsg.id)) return prev
             return [...prev, newMsg]
           })
-
-          // Mark as read if we're the receiver
-          if (newMsg.receiver_id === user?.id) {
-            supabase
-              .from("messages")
-              .update({ read: true })
-              .eq("id", newMsg.id)
-              .then(() => {})
-          }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status)
+      })
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [conversationId, open, user, supabase])
+  }, [conversationId, supabase])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -180,36 +172,59 @@ export function ChatModal({
     const msgContent = content.trim()
     setContent("")
     setSending(true)
+    setChatError("")
 
     const actualReceiverId = isBuyer ? sellerId : messages.find((m) => m.sender_id !== user.id)?.sender_id || sellerId
 
-    const { error } = await supabase.from("messages").insert({
+    // Optimistic update — show message immediately
+    const optimisticMsg: ChatMessage = {
+      id: crypto.randomUUID(),
       conversation_id: conversationId,
       listing_id: listingId,
       sender_id: user.id,
       receiver_id: actualReceiverId,
       content: msgContent,
-    })
-
-    if (error) {
-      console.error("Failed to send message:", error)
-      setContent(msgContent) // Restore the message
-    } else {
-      // Send email notification (non-blocking)
-      fetch("/api/messages/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sellerEmail,
-          sellerName,
-          buyerName: user.name,
-          listingTitle,
-          messageContent: msgContent,
-        }),
-      }).catch(() => {})
+      read: false,
+      created_at: new Date().toISOString(),
     }
+    setMessages((prev) => [...prev, optimisticMsg])
 
-    setSending(false)
+    try {
+      const { error } = await supabase.from("messages").insert({
+        conversation_id: conversationId,
+        listing_id: listingId,
+        sender_id: user.id,
+        receiver_id: actualReceiverId,
+        content: msgContent,
+      })
+
+      if (error) {
+        console.error("Failed to send message:", error)
+        setChatError(`Send failed: ${error.message}`)
+        setContent(msgContent)
+        // Remove optimistic message
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id))
+      } else {
+        // Send email notification (non-blocking)
+        fetch("/api/messages/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sellerEmail,
+            sellerName,
+            buyerName: user.name,
+            listingTitle,
+            messageContent: msgContent,
+          }),
+        }).catch(() => {})
+      }
+    } catch (err) {
+      setChatError("Failed to send. Please try again.")
+      setContent(msgContent)
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id))
+    } finally {
+      setSending(false)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
