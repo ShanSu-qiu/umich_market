@@ -91,7 +91,7 @@ export default function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
-  const handleBookingAction = async (booking: typeof bookings[0], action: "confirmed" | "cancelled") => {
+  const handleBookingAction = async (booking: typeof bookings[0], action: "confirmed" | "cancelled", notificationId?: string) => {
     const { error } = await supabase
       .from("bookings")
       .update({ status: action })
@@ -103,6 +103,12 @@ export default function DashboardPage() {
     }
 
     setBookings((prev) => prev.map((b) => b.id === booking.id ? { ...b, status: action } : b))
+
+    // Dismiss the associated notification if provided
+    if (notificationId) {
+      await supabase.from("notifications").update({ is_read: true }).eq("id", notificationId)
+      setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
+    }
 
     // Notify the buyer
     await supabase.from("notifications").insert({
@@ -411,24 +417,51 @@ export default function DashboardPage() {
             {/* Notifications */}
             {notifications.length > 0 && (
               <div className="mb-4 space-y-2">
-                {notifications.filter((n) => !n.is_read).map((notif) => (
-                  <div key={notif.id} className="flex items-start gap-3 p-3 bg-maize/10 border border-maize/30 rounded-lg text-sm">
-                    <Calendar className="w-4 h-4 mt-0.5 text-maize-foreground shrink-0" />
-                    <div className="flex-1">
-                      <p className="font-medium">{notif.title}</p>
-                      <p className="text-muted-foreground">{notif.message}</p>
+                {notifications.filter((n) => !n.is_read).map((notif) => {
+                  const matchingBooking = notif.type === "booking_reschedule" && notif.listing_id
+                    ? bookings.find((b) => b.listing_id === notif.listing_id && b.status === "pending")
+                    : null
+
+                  return (
+                    <div key={notif.id} className="p-3 bg-maize/10 border border-maize/30 rounded-lg text-sm">
+                      <div className="flex items-start gap-3">
+                        <Calendar className="w-4 h-4 mt-0.5 text-maize-foreground shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-medium">{notif.title}</p>
+                          <p className="text-muted-foreground">{notif.message}</p>
+                        </div>
+                        <button
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                          onClick={async () => {
+                            await supabase.from("notifications").update({ is_read: true }).eq("id", notif.id)
+                            setNotifications((prev) => prev.filter((n) => n.id !== notif.id))
+                          }}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                      {notif.type === "booking_reschedule" && matchingBooking && (
+                        <div className="flex gap-2 mt-3 ml-7">
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => handleBookingAction(matchingBooking, "confirmed", notif.id)}
+                          >
+                            Accept New Date
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => handleBookingAction(matchingBooking, "cancelled", notif.id)}
+                          >
+                            Decline
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    <button
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                      onClick={async () => {
-                        await supabase.from("notifications").update({ is_read: true }).eq("id", notif.id)
-                        setNotifications((prev) => prev.filter((n) => n.id !== notif.id))
-                      }}
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 
