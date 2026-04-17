@@ -65,7 +65,7 @@ export function ChatModal({
         .select("id")
         .eq("listing_id", listingId)
         .eq("buyer_id", isBuyer ? user.id : sellerId)
-        .single()
+        .maybeSingle()
 
       if (!conv && isBuyer) {
         // Create new conversation
@@ -77,7 +77,7 @@ export function ChatModal({
             seller_id: sellerId,
           })
           .select()
-          .single()
+          .maybeSingle()
 
         if (convError) {
           console.error("Failed to create conversation:", convError)
