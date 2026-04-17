@@ -60,12 +60,16 @@ export function ChatModal({
       setLoading(true)
 
       // Find existing conversation
-      let { data: conv } = await supabase
+      let { data: conv, error: findError } = await supabase
         .from("conversations")
         .select("id")
         .eq("listing_id", listingId)
-        .eq("buyer_id", isBuyer ? user.id : sellerId)
+        .eq(isBuyer ? "buyer_id" : "seller_id", user.id)
         .maybeSingle()
+
+      if (findError) {
+        console.error("Failed to find conversation:", findError)
+      }
 
       if (!conv && isBuyer) {
         // Create new conversation
@@ -81,6 +85,7 @@ export function ChatModal({
 
         if (convError) {
           console.error("Failed to create conversation:", convError)
+          setChatError(`Failed to start chat: ${convError.message}`)
         }
         conv = newConv
       }
@@ -163,8 +168,14 @@ export function ChatModal({
     }
   }, [open])
 
+  const [chatError, setChatError] = useState("")
+
   const handleSend = async () => {
-    if (!content.trim() || !conversationId || !user || sending) return
+    if (!content.trim() || !user || sending) return
+    if (!conversationId) {
+      setChatError("Chat not ready. Please close and reopen.")
+      return
+    }
 
     const msgContent = content.trim()
     setContent("")
@@ -271,21 +282,24 @@ export function ChatModal({
 
         {/* Input Area */}
         <div className="p-3 border-t shrink-0">
+          {chatError && (
+            <p className="text-xs text-destructive mb-2">{chatError}</p>
+          )}
           <div className="flex gap-2">
             <input
               ref={inputRef}
               type="text"
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={(e) => { setContent(e.target.value); setChatError("") }}
               onKeyDown={handleKeyDown}
-              placeholder={loading ? "Loading..." : "Type a message..."}
+              placeholder={loading ? "Loading..." : !conversationId ? "Initializing chat..." : "Type a message..."}
               className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
               autoFocus
             />
             <Button
               size="icon"
               onClick={handleSend}
-              disabled={!content.trim() || sending || !conversationId}
+              disabled={!content.trim() || sending}
             >
               <Send className="w-4 h-4" />
             </Button>
