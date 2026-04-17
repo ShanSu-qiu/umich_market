@@ -43,6 +43,7 @@ export function ChatModal({
   const [content, setContent] = useState("")
   const [sending, setSending] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [convBuyerId, setConvBuyerId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -50,7 +51,6 @@ export function ChatModal({
   // Determine who the other person is
   const isBuyer = user?.id !== sellerId
   const otherName = isBuyer ? sellerName : "Buyer"
-  const receiverId = isBuyer ? sellerId : ""
 
   // Find or create conversation + load messages
   useEffect(() => {
@@ -62,7 +62,7 @@ export function ChatModal({
       // Find existing conversation
       let { data: conv, error: findError } = await supabase
         .from("conversations")
-        .select("id")
+        .select("id, buyer_id, seller_id")
         .eq("listing_id", listingId)
         .eq(isBuyer ? "buyer_id" : "seller_id", user.id)
         .maybeSingle()
@@ -85,13 +85,14 @@ export function ChatModal({
 
         if (convError) {
           console.error("Failed to create conversation:", convError)
-          setChatError(`Failed to start chat: ${convError.message}`)
+          setChatError("Failed to start chat. Please try again.")
         }
         conv = newConv
       }
 
       if (conv) {
         setConversationId(conv.id)
+        setConvBuyerId(conv.buyer_id || null)
 
         // Load existing messages
         const { data: msgs } = await supabase
@@ -131,7 +132,7 @@ export function ChatModal({
           table: "messages",
           filter: `conversation_id=eq.${conversationId}`,
         },
-        (payload) => {
+        (payload: { new: Record<string, unknown> }) => {
           const newMsg = payload.new as ChatMessage
           setMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev
@@ -139,9 +140,7 @@ export function ChatModal({
           })
         }
       )
-      .subscribe((status) => {
-        console.log("Realtime subscription status:", status)
-      })
+      .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
@@ -174,7 +173,7 @@ export function ChatModal({
     setSending(true)
     setChatError("")
 
-    const actualReceiverId = isBuyer ? sellerId : messages.find((m) => m.sender_id !== user.id)?.sender_id || sellerId
+    const actualReceiverId = isBuyer ? sellerId : (convBuyerId || messages.find((m) => m.sender_id !== user.id)?.sender_id || "")
 
     // Optimistic update — show message immediately
     const optimisticMsg: ChatMessage = {
@@ -200,7 +199,7 @@ export function ChatModal({
 
       if (error) {
         console.error("Failed to send message:", error)
-        setChatError(`Send failed: ${error.message}`)
+        setChatError("Failed to send message. Please try again.")
         setContent(msgContent)
         // Remove optimistic message
         setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id))
@@ -216,7 +215,7 @@ export function ChatModal({
             listingTitle,
             messageContent: msgContent,
           }),
-        }).catch(() => {})
+        }).catch((err: unknown) => console.warn("Email notification failed:", err))
       }
     } catch (err) {
       setChatError("Failed to send. Please try again.")
@@ -308,6 +307,7 @@ export function ChatModal({
               onChange={(e) => { setContent(e.target.value); setChatError("") }}
               onKeyDown={handleKeyDown}
               placeholder={loading ? "Loading..." : !conversationId ? "Initializing chat..." : "Type a message..."}
+              maxLength={2000}
               className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
               autoFocus
             />

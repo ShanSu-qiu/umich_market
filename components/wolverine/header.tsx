@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Package, Search, User, Menu, Plus, LogIn, LogOut } from "lucide-react"
 import { useState } from "react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
@@ -11,8 +12,17 @@ import { useAuth } from "@/lib/auth-context"
 
 export function Header() {
   const [open, setOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   const { user, isLoading, signOut } = useAuth()
   const router = useRouter()
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      router.push(`/browse?q=${encodeURIComponent(searchQuery.trim())}`)
+      setSearchQuery("")
+    }
+  }
 
   const navLinks = [
     { href: "/browse", label: "Browse" },
@@ -52,12 +62,16 @@ export function Header() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" asChild className="hidden sm:flex">
-              <Link href="/browse">
-                <Search className="w-5 h-5" />
-                <span className="sr-only">Search</span>
-              </Link>
-            </Button>
+            <form onSubmit={handleSearch} className="hidden sm:flex relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search items..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-44 lg:w-56 h-9 pl-8 text-sm"
+              />
+            </form>
 
             {!isLoading && !user && (
               <Button variant="ghost" asChild className="hidden sm:flex text-sm font-medium">

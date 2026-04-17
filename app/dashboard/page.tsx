@@ -16,6 +16,8 @@ import {
   Pencil,
   Trash2,
   MessageCircle,
+  CheckCircle2,
+  MapPin,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useListings } from "@/lib/listings-context"
@@ -37,7 +39,7 @@ type Conversation = {
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("listings")
   const { user, isLoading } = useAuth()
-  const { getMyListings, deleteListing } = useListings()
+  const { getMyListings, deleteListing, refreshListings } = useListings()
   const myListings = getMyListings()
   const activeCount = myListings.filter((l) => l.status === "Active").length
   const supabase = useMemo(() => createClient(), [])
@@ -51,14 +53,21 @@ export default function DashboardPage() {
   const [notifications, setNotifications] = useState<Array<{
     id: string; type: string; title: string; message: string; listing_id: string | null; is_read: boolean; created_at: string
   }>>([])
+  const [buyerBookings, setBuyerBookings] = useState<Array<{
+    id: string; listing_id: string; buyer_id: string; pickup_date: string; notes: string | null; status: string; created_at: string;
+    listing: { title: string; images: string[]; seller_id: string } | null; seller: { display_name: string; email: string } | null
+  }>>([])
+  const [actioningBookingId, setActioningBookingId] = useState<string | null>(null)
 
   const unreadCount = conversations.reduce((count, conv) => {
     return count + conv.messages.filter((m) => !m.read && m.receiver_id === user?.id).length
   }, 0)
   const unreadNotifs = notifications.filter((n) => !n.is_read).length
 
+  // Fetch initial data
   useEffect(() => {
     if (!user) return
+    let cancelled = false
 
     // Fetch conversations
     supabase
@@ -66,7 +75,9 @@ export default function DashboardPage() {
       .select(`*, listing:listings(title, images), buyer:profiles!buyer_id(display_name, email), seller:profiles!seller_id(display_name, email), messages(content, created_at, read, sender_id, receiver_id)`)
       .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
       .order("created_at", { ascending: false })
-      .then(({ data }) => {
+      .then(({ data, error }: { data: unknown; error: unknown }) => {
+        if (cancelled) return
+        if (error) console.error("Failed to fetch conversations:", error)
         setConversations((data as Conversation[]) || [])
         setConvsLoading(false)
       })
@@ -77,7 +88,23 @@ export default function DashboardPage() {
       .select("*, listing:listings!inner(title, seller_id), buyer:profiles!buyer_id(display_name, email)")
       .eq("listing.seller_id", user.id)
       .order("created_at", { ascending: false })
-      .then(({ data }) => setBookings(data || []))
+      .then(({ data, error }: { data: unknown; error: unknown }) => {
+        if (cancelled) return
+        if (error) console.error("Failed to fetch bookings:", error)
+        setBookings((data as typeof bookings) || [])
+      })
+
+    // Fetch buyer's own bookings
+    supabase
+      .from("bookings")
+      .select("*, listing:listings(title, images, seller_id), seller:profiles!inner(display_name, email)")
+      .eq("buyer_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }: { data: unknown; error: unknown }) => {
+        if (cancelled) return
+        if (error) console.error("Failed to fetch buyer bookings:", error)
+        setBuyerBookings((data as typeof buyerBookings) || [])
+      })
 
     // Fetch only unread notifications
     supabase
@@ -87,11 +114,62 @@ export default function DashboardPage() {
       .eq("is_read", false)
       .order("created_at", { ascending: false })
       .limit(20)
-      .then(({ data }) => setNotifications(data || []))
+      .then(({ data, error }: { data: unknown; error: unknown }) => {
+        if (cancelled) return
+        if (error) console.error("Failed to fetch notifications:", error)
+        setNotifications((data as typeof notifications) || [])
+      })
+
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
+
+  // Realtime subscriptions for notifications and messages
+  useEffect(() => {
+    if (!user) return
+
+    const notifChannel = supabase
+      .channel("dashboard-notifications")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        (payload: { new: Record<string, unknown> }) => {
+          const newNotif = payload.new as typeof notifications[0]
+          setNotifications((prev) => [newNotif, ...prev])
+        }
+      )
+      .subscribe()
+
+    const msgChannel = supabase
+      .channel("dashboard-messages")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: `receiver_id=eq.${user.id}` },
+        (payload: { new: Record<string, unknown> }) => {
+          const newMsg = payload.new as { conversation_id: string; content: string; created_at: string; read: boolean; sender_id: string; receiver_id: string }
+          setConversations((prev) =>
+            prev.map((conv) => {
+              if (conv.id === newMsg.conversation_id) {
+                return { ...conv, messages: [...conv.messages, newMsg] }
+              }
+              return conv
+            })
+          )
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(notifChannel)
+      supabase.removeChannel(msgChannel)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
   const handleBookingAction = async (booking: typeof bookings[0], action: "confirmed" | "cancelled", notificationId?: string) => {
+    if (actioningBookingId) return
+    setActioningBookingId(booking.id)
+
     const { error } = await supabase
       .from("bookings")
       .update({ status: action })
@@ -99,6 +177,7 @@ export default function DashboardPage() {
 
     if (error) {
       console.error("Failed to update booking:", error)
+      setActioningBookingId(null)
       return
     }
 
@@ -120,6 +199,22 @@ export default function DashboardPage() {
         : `Your pre-booking for "${booking.listing?.title}" has been declined by the seller.`,
       listing_id: booking.listing_id,
     })
+
+    setActioningBookingId(null)
+  }
+
+  const handleMarkSold = async (listingId: string) => {
+    const { error } = await supabase
+      .from("listings")
+      .update({ status: "sold" })
+      .eq("id", listingId)
+
+    if (error) {
+      console.error("Failed to mark as sold:", error)
+      return
+    }
+
+    await refreshListings()
   }
 
   const getBookingBadge = (status: string) => {
@@ -352,13 +447,25 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               {listing.status !== "Sold" && (
-                                <Link
-                                  href={`/sell/edit/${listing.id}`}
-                                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                  Edit
-                                </Link>
+                                <>
+                                  <Link
+                                    href={`/sell/edit/${listing.id}`}
+                                    className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                    Edit
+                                  </Link>
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm("Mark this item as sold?")) return
+                                      await handleMarkSold(listing.id)
+                                    }}
+                                    className="flex items-center gap-1 text-sm text-green-600 hover:text-green-800 transition-colors"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    Sold
+                                  </button>
+                                </>
                               )}
                               <button
                                 onClick={async () => {
@@ -370,9 +477,7 @@ export default function DashboardPage() {
                                 <Trash2 className="w-3.5 h-3.5" />
                                 Delete
                               </button>
-                              <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400">
-                                {listing.status}
-                              </Badge>
+                              {getStatusBadge(listing.status)}
                             </div>
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">
@@ -400,16 +505,55 @@ export default function DashboardPage() {
 
           {/* My Purchases Tab */}
           <TabsContent value="purchases" className="mt-6">
-            <Card>
-              <CardContent className="py-12 text-center">
-                <ShoppingBag className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-semibold mb-2">No purchases yet</h3>
-                <p className="text-muted-foreground mb-4">Browse items from other Michigan students!</p>
-                <Button asChild variant="outline">
-                  <Link href="/browse">Browse Items</Link>
-                </Button>
-              </CardContent>
-            </Card>
+            {buyerBookings.length > 0 ? (
+              <div className="space-y-3">
+                {buyerBookings.map((booking) => (
+                  <Card key={booking.id}>
+                    <CardContent className="p-4">
+                      <div className="flex gap-4">
+                        {booking.listing?.images?.[0] && (
+                          <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-muted shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={booking.listing.images[0]} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <Link href={`/item/${booking.listing_id}`} className="font-semibold hover:underline line-clamp-1">
+                                {booking.listing?.title || "Listing"}
+                              </Link>
+                              <p className="text-sm text-muted-foreground">
+                                Seller: {booking.seller?.display_name || booking.seller?.email || "Unknown"}
+                              </p>
+                            </div>
+                            {getBookingBadge(booking.status)}
+                          </div>
+                          <div className="flex items-center gap-2 mt-2 text-sm">
+                            <Calendar className="w-4 h-4 text-primary" />
+                            <span>Pickup: <strong>{new Date(booking.pickup_date).toLocaleDateString()}</strong></span>
+                          </div>
+                          {booking.notes && (
+                            <p className="text-sm text-muted-foreground mt-1">Notes: {booking.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <ShoppingBag className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="font-semibold mb-2">No purchases yet</h3>
+                  <p className="text-muted-foreground mb-4">Browse items from other Michigan students!</p>
+                  <Button asChild variant="outline">
+                    <Link href="/browse">Browse Items</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Pre-bookings Tab */}
@@ -491,14 +635,16 @@ export default function DashboardPage() {
                           <Button
                             size="sm"
                             className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                            disabled={actioningBookingId === booking.id}
                             onClick={() => handleBookingAction(booking, "confirmed")}
                           >
-                            Accept
+                            {actioningBookingId === booking.id ? "Updating..." : "Accept"}
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             className="flex-1"
+                            disabled={actioningBookingId === booking.id}
                             onClick={() => handleBookingAction(booking, "cancelled")}
                           >
                             Decline

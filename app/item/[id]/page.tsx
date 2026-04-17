@@ -38,6 +38,10 @@ export default function ItemDetailPage() {
   const [preBookNotes, setPreBookNotes] = useState("")
   const [preBookOpen, setPreBookOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [preBookSending, setPreBookSending] = useState(false)
+  const [preBookSuccess, setPreBookSuccess] = useState(false)
+  const [existingBooking, setExistingBooking] = useState<{ id: string; pickup_date: string } | null>(null)
+  const [showReplaceConfirm, setShowReplaceConfirm] = useState(false)
   const { user } = useAuth()
 
   if (!listing) {
@@ -69,11 +73,6 @@ export default function ItemDetailPage() {
   const prevImage = () => {
     setCurrentImageIndex((prev) => (prev - 1 + listing.images.length) % listing.images.length)
   }
-
-  const [preBookSending, setPreBookSending] = useState(false)
-  const [preBookSuccess, setPreBookSuccess] = useState(false)
-  const [existingBooking, setExistingBooking] = useState<{ id: string; pickup_date: string } | null>(null)
-  const [showReplaceConfirm, setShowReplaceConfirm] = useState(false)
 
   const getSupabase = () => createClient()
 
@@ -146,7 +145,7 @@ export default function ItemDetailPage() {
             ? `Pickup date change request to ${preBookDate.toLocaleDateString()}.`
             : `Pre-booking request for pickup on ${preBookDate.toLocaleDateString()}.`,
         }),
-      }).catch(() => {})
+      }).catch((err: unknown) => console.warn("Email notification failed:", err))
 
       setPreBookSuccess(true)
       setTimeout(() => {
@@ -324,7 +323,9 @@ export default function ItemDetailPage() {
                   </div>
                   <div>
                     <p className="font-semibold">{listing.sellerName}</p>
-                    <p className="text-sm text-muted-foreground">{listing.sellerEmail}</p>
+                    {user && (
+                      <p className="text-sm text-muted-foreground">{listing.sellerEmail}</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -443,7 +444,7 @@ export default function ItemDetailPage() {
                   </DialogContent>
                 </Dialog>
               ) : (
-                <Button className="flex-1" size="lg">
+                <Button className="flex-1" size="lg" onClick={openChat}>
                   <MessageCircle className="w-4 h-4 mr-2" />
                   Request to Buy
                 </Button>
