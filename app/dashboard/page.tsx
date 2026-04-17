@@ -20,17 +20,18 @@ import {
 import { useAuth } from "@/lib/auth-context"
 import { useListings } from "@/lib/listings-context"
 import { createClient } from "@/lib/supabase/client"
+import { ChatModal } from "@/components/wolverine/chat-modal"
 
-type Message = {
+type Conversation = {
   id: string
   listing_id: string
-  sender_id: string
-  receiver_id: string
-  content: string
-  read: boolean
+  buyer_id: string
+  seller_id: string
   created_at: string
-  listing: { title: string } | null
-  sender: { display_name: string; email: string } | null
+  listing: { title: string; images: string[] } | null
+  buyer: { display_name: string; email: string } | null
+  seller: { display_name: string; email: string } | null
+  messages: { content: string; created_at: string; read: boolean; sender_id: string; receiver_id: string }[]
 }
 
 export default function DashboardPage() {
@@ -40,28 +41,33 @@ export default function DashboardPage() {
   const myListings = getMyListings()
   const activeCount = myListings.filter((l) => l.status === "Active").length
   const supabase = useMemo(() => createClient(), [])
-  const [messages, setMessages] = useState<Message[]>([])
-  const [messagesLoading, setMessagesLoading] = useState(true)
-  const unreadCount = messages.filter((m) => !m.read && m.receiver_id === user?.id).length
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [convsLoading, setConvsLoading] = useState(true)
+  const [openChatConv, setOpenChatConv] = useState<Conversation | null>(null)
+
+  const unreadCount = conversations.reduce((count, conv) => {
+    return count + conv.messages.filter((m) => !m.read && m.receiver_id === user?.id).length
+  }, 0)
 
   useEffect(() => {
     if (!user) return
-    const fetchMessages = async () => {
+    const fetchConversations = async () => {
       const { data } = await supabase
-        .from("messages")
-        .select("*, listing:listings(title), sender:profiles!sender_id(display_name, email)")
-        .or(`receiver_id.eq.${user.id},sender_id.eq.${user.id}`)
+        .from("conversations")
+        .select(`
+          *,
+          listing:listings(title, images),
+          buyer:profiles!buyer_id(display_name, email),
+          seller:profiles!seller_id(display_name, email),
+          messages(content, created_at, read, sender_id, receiver_id)
+        `)
+        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
         .order("created_at", { ascending: false })
-      setMessages((data as Message[]) || [])
-      setMessagesLoading(false)
+      setConversations((data as Conversation[]) || [])
+      setConvsLoading(false)
     }
-    fetchMessages()
+    fetchConversations()
   }, [user, supabase])
-
-  const markAsRead = async (messageId: string) => {
-    await supabase.from("messages").update({ read: true }).eq("id", messageId)
-    setMessages((prev) => prev.map((m) => m.id === messageId ? { ...m, read: true } : m))
-  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -353,46 +359,62 @@ export default function DashboardPage() {
 
           {/* Messages Tab */}
           <TabsContent value="messages" className="mt-6">
-            {messagesLoading ? (
+            {convsLoading ? (
               <Card>
                 <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">Loading messages...</p>
+                  <p className="text-muted-foreground">Loading conversations...</p>
                 </CardContent>
               </Card>
-            ) : messages.length > 0 ? (
+            ) : conversations.length > 0 ? (
               <div className="space-y-3">
-                {messages.map((msg) => {
-                  const isReceived = msg.receiver_id === user?.id
+                {conversations.map((conv) => {
+                  const isBuyer = conv.buyer_id === user?.id
+                  const otherPerson = isBuyer ? conv.seller : conv.buyer
+                  const otherName = otherPerson?.display_name || otherPerson?.email || "Unknown"
+                  const lastMsg = conv.messages.sort((a, b) =>
+                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                  )[0]
+                  const unread = conv.messages.filter((m) => !m.read && m.receiver_id === user?.id).length
+
                   return (
                     <Card
-                      key={msg.id}
-                      className={!msg.read && isReceived ? "border-primary/50 bg-primary/5" : ""}
-                      onClick={() => { if (!msg.read && isReceived) markAsRead(msg.id) }}
+                      key={conv.id}
+                      className={`cursor-pointer hover:bg-muted/50 transition-colors ${unread > 0 ? "border-primary/50" : ""}`}
+                      onClick={() => setOpenChatConv(conv)}
                     >
                       <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          {conv.listing?.images?.[0] && (
+                            <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted shrink-0">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={conv.listing.images[0]} alt="" className="w-full h-full object-cover" />
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-sm">
-                                {isReceived ? (msg.sender?.display_name || msg.sender?.email || "Someone") : "You"}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {isReceived ? "sent you a message" : "sent a message"}
-                              </span>
-                              {!msg.read && isReceived && (
-                                <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-sm">{otherName}</span>
+                                {unread > 0 && (
+                                  <span className="bg-primary text-primary-foreground text-xs rounded-full px-1.5 py-0.5">
+                                    {unread}
+                                  </span>
+                                )}
+                              </div>
+                              {lastMsg && (
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(lastMsg.created_at).toLocaleDateString()}
+                                </span>
                               )}
                             </div>
-                            {msg.listing && (
-                              <p className="text-xs text-muted-foreground mb-2">
-                                Re: <Link href={`/item/${msg.listing_id}`} className="text-primary hover:underline">{msg.listing.title}</Link>
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {conv.listing?.title || "Listing"}
+                            </p>
+                            {lastMsg && (
+                              <p className="text-sm text-muted-foreground line-clamp-1">
+                                {lastMsg.sender_id === user?.id ? "You: " : ""}{lastMsg.content}
                               </p>
                             )}
-                            <p className="text-sm text-muted-foreground line-clamp-2">{msg.content}</p>
                           </div>
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            {new Date(msg.created_at).toLocaleDateString()}
-                          </span>
                         </div>
                       </CardContent>
                     </Card>
@@ -403,12 +425,24 @@ export default function DashboardPage() {
               <Card>
                 <CardContent className="py-12 text-center">
                   <MessageCircle className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-semibold mb-2">No messages yet</h3>
+                  <h3 className="font-semibold mb-2">No conversations yet</h3>
                   <p className="text-muted-foreground">
                     Messages from buyers will appear here.
                   </p>
                 </CardContent>
               </Card>
+            )}
+
+            {openChatConv && user && (
+              <ChatModal
+                open={!!openChatConv}
+                onClose={() => setOpenChatConv(null)}
+                listingId={openChatConv.listing_id}
+                listingTitle={openChatConv.listing?.title || "Listing"}
+                sellerId={openChatConv.seller_id}
+                sellerName={openChatConv.seller?.display_name || openChatConv.seller?.email || "Seller"}
+                sellerEmail={openChatConv.seller?.email || ""}
+              />
             )}
           </TabsContent>
 

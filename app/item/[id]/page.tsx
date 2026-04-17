@@ -21,9 +21,10 @@ import {
 } from "lucide-react"
 import { PreBookBadge } from "@/components/wolverine/pre-book-badge"
 import { ItemCard } from "@/components/wolverine/item-card"
+import { ChatModal } from "@/components/wolverine/chat-modal"
 import { useListings } from "@/lib/listings-context"
 import { useAuth } from "@/lib/auth-context"
-import { createClient } from "@/lib/supabase/client"
+
 
 export default function ItemDetailPage() {
   const params = useParams()
@@ -35,10 +36,7 @@ export default function ItemDetailPage() {
   const [preBookDate, setPreBookDate] = useState<Date | undefined>()
   const [preBookNotes, setPreBookNotes] = useState("")
   const [preBookOpen, setPreBookOpen] = useState(false)
-  const [messageOpen, setMessageOpen] = useState(false)
-  const [message, setMessage] = useState("")
-  const [messageSent, setMessageSent] = useState(false)
-  const [messageSending, setMessageSending] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
   const { user } = useAuth()
 
   if (!listing) {
@@ -78,54 +76,12 @@ export default function ItemDetailPage() {
     setPreBookNotes("")
   }
 
-  const handleMessage = async () => {
+  const openChat = () => {
     if (!user) {
       window.location.href = `/login?redirect=/item/${listing.id}`
       return
     }
-
-    setMessageSending(true)
-    try {
-      const supabase = createClient()
-
-      const { error } = await supabase.from("messages").insert({
-        listing_id: listing.id,
-        sender_id: user.id,
-        receiver_id: listing.sellerId,
-        content: message,
-      })
-
-      if (error) {
-        console.error("Failed to send message:", error)
-        alert("Failed to send message. Please try again.")
-        return
-      }
-
-      // Send email notification
-      await fetch("/api/messages/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sellerEmail: listing.sellerEmail,
-          sellerName: listing.sellerName,
-          buyerName: user.name,
-          listingTitle: listing.title,
-          messageContent: message,
-        }),
-      }).catch(() => {}) // Don't block on email failure
-
-      setMessageSent(true)
-      setMessage("")
-      setTimeout(() => {
-        setMessageOpen(false)
-        setMessageSent(false)
-      }, 2000)
-    } catch (err) {
-      console.error("Failed to send message:", err)
-      alert("Something went wrong. Please try again.")
-    } finally {
-      setMessageSending(false)
-    }
+    setChatOpen(true)
   }
 
   return (
@@ -254,46 +210,20 @@ export default function ItemDetailPage() {
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
-              <Dialog open={messageOpen} onOpenChange={setMessageOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="flex-1" size="lg">
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    Message Seller
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Message {listing.sellerName}</DialogTitle>
-                    <DialogDescription>
-                      Send a message about this item. The seller will be notified via email.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label>Your Message</Label>
-                      <Textarea
-                        placeholder={`Hi! I'm interested in "${listing.title}"...`}
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        rows={4}
-                      />
-                    </div>
-                  </div>
-                  {messageSent && (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-                      Message sent successfully!
-                    </div>
-                  )}
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setMessageOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleMessage} disabled={!message.trim() || messageSending || messageSent}>
-                      {messageSending ? "Sending..." : messageSent ? "Sent!" : "Send Message"}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              <Button variant="outline" className="flex-1" size="lg" onClick={openChat}>
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Message Seller
+              </Button>
+
+              <ChatModal
+                open={chatOpen}
+                onClose={() => setChatOpen(false)}
+                listingId={listing.id}
+                listingTitle={listing.title}
+                sellerId={listing.sellerId}
+                sellerName={listing.sellerName}
+                sellerEmail={listing.sellerEmail}
+              />
 
               {listing.preBookAvailable ? (
                 <Dialog open={preBookOpen} onOpenChange={setPreBookOpen}>
