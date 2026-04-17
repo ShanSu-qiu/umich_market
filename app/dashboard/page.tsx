@@ -419,7 +419,7 @@ export default function DashboardPage() {
               <div className="mb-4 space-y-2">
                 {notifications.filter((n) => !n.is_read).map((notif) => {
                   const matchingBooking = notif.type === "booking_reschedule" && notif.listing_id
-                    ? bookings.find((b) => b.listing_id === notif.listing_id && b.status === "pending")
+                    ? bookings.find((b) => b.listing_id === notif.listing_id)
                     : null
 
                   return (
