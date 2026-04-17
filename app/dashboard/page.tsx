@@ -79,11 +79,12 @@ export default function DashboardPage() {
       .order("created_at", { ascending: false })
       .then(({ data }) => setBookings(data || []))
 
-    // Fetch notifications
+    // Fetch only unread notifications
     supabase
       .from("notifications")
       .select("*")
       .eq("user_id", user.id)
+      .eq("is_read", false)
       .order("created_at", { ascending: false })
       .limit(20)
       .then(({ data }) => setNotifications(data || []))
@@ -421,7 +422,7 @@ export default function DashboardPage() {
                       className="text-xs text-muted-foreground hover:text-foreground"
                       onClick={async () => {
                         await supabase.from("notifications").update({ is_read: true }).eq("id", notif.id)
-                        setNotifications((prev) => prev.map((n) => n.id === notif.id ? { ...n, is_read: true } : n))
+                        setNotifications((prev) => prev.filter((n) => n.id !== notif.id))
                       }}
                     >
                       Dismiss

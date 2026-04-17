@@ -24,6 +24,7 @@ import { ItemCard } from "@/components/wolverine/item-card"
 import { ChatModal } from "@/components/wolverine/chat-modal"
 import { useListings } from "@/lib/listings-context"
 import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase/client"
 
 
 export default function ItemDetailPage() {
@@ -71,41 +72,66 @@ export default function ItemDetailPage() {
 
   const [preBookSending, setPreBookSending] = useState(false)
   const [preBookSuccess, setPreBookSuccess] = useState(false)
+  const [existingBooking, setExistingBooking] = useState<{ id: string; pickup_date: string } | null>(null)
+  const [showReplaceConfirm, setShowReplaceConfirm] = useState(false)
 
-  const handlePreBook = async () => {
-    if (!user) {
-      window.location.href = `/login?redirect=/item/${listing.id}`
-      return
-    }
-    if (!preBookDate) return
+  const getSupabase = () => createClient()
+
+  const submitBooking = async (mode: "new" | "replace", existingId?: string) => {
+    if (!user || !preBookDate) return
 
     setPreBookSending(true)
+    setShowReplaceConfirm(false)
     try {
-      const supabase = (await import("@/lib/supabase/client")).createClient()
+      const supabase = getSupabase()
 
-      // Create booking record
-      const { error: bookingError } = await supabase.from("bookings").insert({
-        listing_id: listing.id,
-        buyer_id: user.id,
-        pickup_date: preBookDate.toISOString().split("T")[0],
-        notes: preBookNotes || null,
-        status: "pending",
-      })
+      if (mode === "replace" && existingId) {
+        // Update existing booking
+        const { error } = await supabase.from("bookings").update({
+          pickup_date: preBookDate.toISOString().split("T")[0],
+          notes: preBookNotes || null,
+          status: "pending",
+        }).eq("id", existingId)
 
-      if (bookingError) {
-        console.error("Failed to create booking:", bookingError)
-        alert("Failed to submit pre-booking. Please try again.")
-        return
+        if (error) {
+          console.error("Failed to update booking:", error)
+          alert("Failed to update pre-booking. Please try again.")
+          return
+        }
+
+        // Notify seller of reschedule
+        await supabase.from("notifications").insert({
+          user_id: listing.sellerId,
+          type: "booking_reschedule",
+          title: "Pickup Date Change Request",
+          message: `${user.name} wants to change their pickup for "${listing.title}" to ${preBookDate.toLocaleDateString()}.`,
+          listing_id: listing.id,
+        })
+      } else {
+        // Create new booking
+        const { error } = await supabase.from("bookings").insert({
+          listing_id: listing.id,
+          buyer_id: user.id,
+          pickup_date: preBookDate.toISOString().split("T")[0],
+          notes: preBookNotes || null,
+          status: "pending",
+        })
+
+        if (error) {
+          console.error("Failed to create booking:", error)
+          alert("Failed to submit pre-booking. Please try again.")
+          return
+        }
+
+        // Notify seller
+        await supabase.from("notifications").insert({
+          user_id: listing.sellerId,
+          type: "prebooking_received",
+          title: "New Pre-booking Request",
+          message: `${user.name} has pre-booked "${listing.title}" for pickup on ${preBookDate.toLocaleDateString()}.`,
+          listing_id: listing.id,
+        })
       }
-
-      // Create notification for seller
-      await supabase.from("notifications").insert({
-        user_id: listing.sellerId,
-        type: "prebooking_received",
-        title: "New Pre-booking Request",
-        message: `${user.name} has pre-booked "${listing.title}" for pickup on ${preBookDate.toLocaleDateString()}.`,
-        listing_id: listing.id,
-      })
 
       // Send email notification
       fetch("/api/messages/notify", {
@@ -116,7 +142,9 @@ export default function ItemDetailPage() {
           sellerName: listing.sellerName,
           buyerName: user.name,
           listingTitle: listing.title,
-          messageContent: `Pre-booking request for pickup on ${preBookDate.toLocaleDateString()}. ${preBookNotes ? `Notes: ${preBookNotes}` : ""}`,
+          messageContent: mode === "replace"
+            ? `Pickup date change request to ${preBookDate.toLocaleDateString()}.`
+            : `Pre-booking request for pickup on ${preBookDate.toLocaleDateString()}.`,
         }),
       }).catch(() => {})
 
@@ -126,6 +154,7 @@ export default function ItemDetailPage() {
         setPreBookSuccess(false)
         setPreBookDate(undefined)
         setPreBookNotes("")
+        setExistingBooking(null)
       }, 2000)
     } catch (err) {
       console.error("Pre-booking failed:", err)
@@ -133,6 +162,33 @@ export default function ItemDetailPage() {
     } finally {
       setPreBookSending(false)
     }
+  }
+
+  const handlePreBook = async () => {
+    if (!user) {
+      window.location.href = `/login?redirect=/item/${listing.id}`
+      return
+    }
+    if (!preBookDate) return
+
+    const supabase = getSupabase()
+
+    // Check for existing active booking
+    const { data: existing } = await supabase
+      .from("bookings")
+      .select("id, pickup_date")
+      .eq("listing_id", listing.id)
+      .eq("buyer_id", user.id)
+      .not("status", "eq", "cancelled")
+      .maybeSingle()
+
+    if (existing) {
+      setExistingBooking(existing)
+      setShowReplaceConfirm(true)
+      return
+    }
+
+    await submitBooking("new")
   }
 
   const openChat = () => {
@@ -330,23 +386,53 @@ export default function ItemDetailPage() {
                         </div>
                       </div>
                     </div>
-                    {preBookSuccess && (
-                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-                        Pre-booking submitted successfully! The seller will be notified.
+                    {showReplaceConfirm && existingBooking && (
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+                        <p className="text-amber-800">
+                          You already have a pre-booking for this item on{" "}
+                          <strong>{new Date(existingBooking.pickup_date).toLocaleDateString()}</strong>.
+                          {preBookDate && (
+                            <> Replace with <strong>{preBookDate.toLocaleDateString()}</strong>?</>
+                          )}
+                        </p>
+                        <div className="flex gap-2 mt-3">
+                          <Button
+                            size="sm"
+                            className="bg-amber-600 hover:bg-amber-700 text-white"
+                            onClick={() => submitBooking("replace", existingBooking.id)}
+                            disabled={preBookSending}
+                          >
+                            {preBookSending ? "Updating..." : "Yes, Replace"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowReplaceConfirm(false)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
                       </div>
                     )}
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setPreBookOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handlePreBook}
-                        disabled={!preBookDate || preBookSending || preBookSuccess}
-                        className="bg-maize text-maize-foreground hover:bg-maize/90"
-                      >
-                        {preBookSending ? "Submitting..." : preBookSuccess ? "Submitted!" : "Confirm Pre-booking"}
-                      </Button>
-                    </DialogFooter>
+                    {preBookSuccess && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+                        {existingBooking ? "Pre-booking updated! The seller will be notified." : "Pre-booking submitted! The seller will be notified."}
+                      </div>
+                    )}
+                    {!showReplaceConfirm && (
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setPreBookOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handlePreBook}
+                          disabled={!preBookDate || preBookSending || preBookSuccess}
+                          className="bg-maize text-maize-foreground hover:bg-maize/90"
+                        >
+                          {preBookSending ? "Submitting..." : preBookSuccess ? "Submitted!" : "Confirm Pre-booking"}
+                        </Button>
+                      </DialogFooter>
+                    )}
                   </DialogContent>
                 </Dialog>
               ) : (
