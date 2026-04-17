@@ -24,7 +24,9 @@ export default function SignupPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const redirect = params.get("redirect")
-    if (redirect) setRedirectTo(redirect)
+    if (redirect && redirect.startsWith("/") && !redirect.startsWith("//")) {
+      setRedirectTo(redirect)
+    }
   }, [])
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -84,9 +86,9 @@ export default function SignupPage() {
                 <ShieldCheck className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold mb-1">Verified Students Only</h3>
+                <h3 className="font-semibold mb-1">Verified Community</h3>
                 <p className="text-sm text-muted-foreground">
-                  Every user is verified with their University of Michigan email address.
+                  Join a trusted marketplace built for University of Michigan students.
                 </p>
               </div>
             </div>

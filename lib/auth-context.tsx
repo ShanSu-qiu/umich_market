@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { User } from "@supabase/supabase-js"
+import type { User, AuthChangeEvent, Session } from "@supabase/supabase-js"
 
 export type AuthUser = {
   id: string
@@ -37,14 +37,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session once
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
+    const fetchUser = async () => {
+      const { data: { user: u } } = await supabase.auth.getUser()
       setUser(u ? toAuthUser(u) : null)
       setIsLoading(false)
-    })
+    }
+    fetchUser()
 
     // Listen for changes — no async calls inside callback
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (_event: AuthChangeEvent, session: Session | null) => {
         setUser(session?.user ? toAuthUser(session.user) : null)
         setIsLoading(false)
       }

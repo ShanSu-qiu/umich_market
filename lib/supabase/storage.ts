@@ -6,16 +6,26 @@ export async function uploadListingImages(
 ): Promise<string[]> {
   const supabase = createClient()
 
-  // Verify we have a session before uploading
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  // Verify we have an authenticated user before uploading
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     throw new Error("Not authenticated. Please sign in and try again.")
   }
+
+  const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"]
+  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
   const urls: string[] = []
 
   for (const file of files) {
     if (!file) continue
+
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error(`File "${file.name}" is too large. Maximum size is 10MB.`)
+    }
+    if (file.type && !ALLOWED_MIME_TYPES.includes(file.type)) {
+      throw new Error(`File "${file.name}" has an invalid type. Only JPEG, PNG, WebP, GIF, and HEIC are allowed.`)
+    }
 
     const fileExt = file.name.split(".").pop() || "jpg"
     const fileName = `${userId}/${crypto.randomUUID()}.${fileExt}`

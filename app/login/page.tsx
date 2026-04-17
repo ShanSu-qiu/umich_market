@@ -38,7 +38,8 @@ function LoginForm() {
       }
 
       // No error means login succeeded — hard redirect to ensure full page reload with session
-      const redirectTo = searchParams.get("redirect") || "/dashboard"
+      const raw = searchParams.get("redirect") || "/dashboard"
+      const redirectTo = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/dashboard"
       window.location.href = redirectTo
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.")
@@ -68,7 +69,7 @@ function LoginForm() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <Link href="#" className="text-sm text-primary hover:underline">Forgot password?</Link>
+                <Link href="/forgot-password" className="text-sm text-primary hover:underline">Forgot password?</Link>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />

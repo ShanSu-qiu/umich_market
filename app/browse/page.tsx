@@ -84,7 +84,7 @@ function BrowsePageContent() {
     
     // Area filter
     if (selectedAreas.length > 0) {
-      items = items.filter((item) => item.pickupArea && selectedAreas.includes(item.pickupArea))
+      items = items.filter((item) => item.pickupLocation && selectedAreas.some((area) => item.pickupLocation.toLowerCase().includes(area.toLowerCase())))
     }
     
     // Price filter
@@ -97,10 +97,10 @@ function BrowsePageContent() {
       items = items.filter((item) => item.preBookAvailable)
     }
     
-    // Rating filter
-    if (minRating > 0) {
-      items = items.filter((item) => (item.sellerRating ?? 0) >= minRating)
-    }
+    // Rating filter — disabled until ratings system is implemented
+    // if (minRating > 0) {
+    //   items = items.filter((item) => item.sellerRating >= minRating)
+    // }
     
     // Sort
     switch (sortBy) {
@@ -111,7 +111,8 @@ function BrowsePageContent() {
         items.sort((a, b) => b.price - a.price)
         break
       case "popular":
-        items.sort((a, b) => (b.sellerTransactions ?? 0) - (a.sellerTransactions ?? 0))
+        // Sort by creation date as placeholder until transaction data is available
+        items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         break
       default:
         items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
