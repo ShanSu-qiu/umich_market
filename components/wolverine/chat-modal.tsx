@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Send, X } from "lucide-react"
 
@@ -70,7 +69,7 @@ export function ChatModal({
 
       if (!conv && isBuyer) {
         // Create new conversation
-        const { data: newConv } = await supabase
+        const { data: newConv, error: convError } = await supabase
           .from("conversations")
           .insert({
             listing_id: listingId,
@@ -79,6 +78,10 @@ export function ChatModal({
           })
           .select()
           .single()
+
+        if (convError) {
+          console.error("Failed to create conversation:", convError)
+        }
         conv = newConv
       }
 
@@ -218,7 +221,10 @@ export function ChatModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
-      <DialogContent className="max-w-md p-0 gap-0 flex flex-col h-[70vh] max-h-[600px]">
+      <DialogContent
+        className="max-w-md p-0 gap-0 flex flex-col h-[70vh] max-h-[600px]"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         {/* Header */}
         <DialogHeader className="p-4 border-b shrink-0">
           <DialogTitle className="text-base">
@@ -266,14 +272,15 @@ export function ChatModal({
         {/* Input Area */}
         <div className="p-3 border-t shrink-0">
           <div className="flex gap-2">
-            <Input
+            <input
               ref={inputRef}
+              type="text"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type a message..."
-              className="flex-1"
-              disabled={!conversationId || loading}
+              placeholder={loading ? "Loading..." : "Type a message..."}
+              className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              autoFocus
             />
             <Button
               size="icon"
