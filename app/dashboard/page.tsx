@@ -90,6 +90,46 @@ export default function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
+  const handleBookingAction = async (booking: typeof bookings[0], action: "confirmed" | "cancelled") => {
+    const { error } = await supabase
+      .from("bookings")
+      .update({ status: action })
+      .eq("id", booking.id)
+
+    if (error) {
+      console.error("Failed to update booking:", error)
+      return
+    }
+
+    setBookings((prev) => prev.map((b) => b.id === booking.id ? { ...b, status: action } : b))
+
+    // Notify the buyer
+    await supabase.from("notifications").insert({
+      user_id: booking.buyer_id,
+      type: action === "confirmed" ? "booking_confirmed" : "booking_cancelled",
+      title: action === "confirmed" ? "Pre-booking Confirmed!" : "Pre-booking Declined",
+      message: action === "confirmed"
+        ? `Your pre-booking for "${booking.listing?.title}" has been confirmed for ${new Date(booking.pickup_date).toLocaleDateString()}.`
+        : `Your pre-booking for "${booking.listing?.title}" has been declined by the seller.`,
+      listing_id: booking.listing_id,
+    })
+  }
+
+  const getBookingBadge = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400">Pending</Badge>
+      case "confirmed":
+        return <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400">Confirmed</Badge>
+      case "cancelled":
+        return <Badge variant="secondary" className="text-muted-foreground">Declined</Badge>
+      case "completed":
+        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400">Completed</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "Active":
@@ -410,8 +450,27 @@ export default function DashboardPage() {
                             <p className="text-sm text-muted-foreground mt-1">Notes: {booking.notes}</p>
                           )}
                         </div>
-                        <Badge className="bg-maize/20 text-maize-foreground">{booking.status}</Badge>
+                        {getBookingBadge(booking.status)}
                       </div>
+                      {booking.status === "pending" && (
+                        <div className="flex gap-2 mt-3">
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => handleBookingAction(booking, "confirmed")}
+                          >
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => handleBookingAction(booking, "cancelled")}
+                          >
+                            Decline
+                          </Button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
