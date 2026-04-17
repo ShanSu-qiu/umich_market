@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -15,9 +15,23 @@ import {
   LogIn,
   Pencil,
   Trash2,
+  MessageCircle,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useListings } from "@/lib/listings-context"
+import { createClient } from "@/lib/supabase/client"
+
+type Message = {
+  id: string
+  listing_id: string
+  sender_id: string
+  receiver_id: string
+  content: string
+  read: boolean
+  created_at: string
+  listing: { title: string } | null
+  sender: { display_name: string; email: string } | null
+}
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("listings")
@@ -25,6 +39,29 @@ export default function DashboardPage() {
   const { getMyListings, deleteListing } = useListings()
   const myListings = getMyListings()
   const activeCount = myListings.filter((l) => l.status === "Active").length
+  const supabase = useMemo(() => createClient(), [])
+  const [messages, setMessages] = useState<Message[]>([])
+  const [messagesLoading, setMessagesLoading] = useState(true)
+  const unreadCount = messages.filter((m) => !m.read && m.receiver_id === user?.id).length
+
+  useEffect(() => {
+    if (!user) return
+    const fetchMessages = async () => {
+      const { data } = await supabase
+        .from("messages")
+        .select("*, listing:listings(title), sender:profiles!sender_id(display_name, email)")
+        .or(`receiver_id.eq.${user.id},sender_id.eq.${user.id}`)
+        .order("created_at", { ascending: false })
+      setMessages((data as Message[]) || [])
+      setMessagesLoading(false)
+    }
+    fetchMessages()
+  }, [user, supabase])
+
+  const markAsRead = async (messageId: string) => {
+    await supabase.from("messages").update({ read: true }).eq("id", messageId)
+    setMessages((prev) => prev.map((m) => m.id === messageId ? { ...m, read: true } : m))
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -196,6 +233,15 @@ export default function DashboardPage() {
               <Calendar className="w-4 h-4" />
               Pre-bookings
             </TabsTrigger>
+            <TabsTrigger value="messages" className="gap-2">
+              <MessageCircle className="w-4 h-4" />
+              Messages
+              {unreadCount > 0 && (
+                <span className="bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 ml-1">
+                  {unreadCount}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="credit" className="gap-2">
               <Star className="w-4 h-4" />
               Credit Score
@@ -303,6 +349,67 @@ export default function DashboardPage() {
                 </p>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Messages Tab */}
+          <TabsContent value="messages" className="mt-6">
+            {messagesLoading ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-muted-foreground">Loading messages...</p>
+                </CardContent>
+              </Card>
+            ) : messages.length > 0 ? (
+              <div className="space-y-3">
+                {messages.map((msg) => {
+                  const isReceived = msg.receiver_id === user?.id
+                  return (
+                    <Card
+                      key={msg.id}
+                      className={!msg.read && isReceived ? "border-primary/50 bg-primary/5" : ""}
+                      onClick={() => { if (!msg.read && isReceived) markAsRead(msg.id) }}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold text-sm">
+                                {isReceived ? (msg.sender?.display_name || msg.sender?.email || "Someone") : "You"}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {isReceived ? "sent you a message" : "sent a message"}
+                              </span>
+                              {!msg.read && isReceived && (
+                                <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                              )}
+                            </div>
+                            {msg.listing && (
+                              <p className="text-xs text-muted-foreground mb-2">
+                                Re: <Link href={`/item/${msg.listing_id}`} className="text-primary hover:underline">{msg.listing.title}</Link>
+                              </p>
+                            )}
+                            <p className="text-sm text-muted-foreground line-clamp-2">{msg.content}</p>
+                          </div>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {new Date(msg.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <MessageCircle className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="font-semibold mb-2">No messages yet</h3>
+                  <p className="text-muted-foreground">
+                    Messages from buyers will appear here.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Credit Score Tab */}

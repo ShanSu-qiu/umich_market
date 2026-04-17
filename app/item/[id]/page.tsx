@@ -22,6 +22,8 @@ import {
 import { PreBookBadge } from "@/components/wolverine/pre-book-badge"
 import { ItemCard } from "@/components/wolverine/item-card"
 import { useListings } from "@/lib/listings-context"
+import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase/client"
 
 export default function ItemDetailPage() {
   const params = useParams()
@@ -35,6 +37,9 @@ export default function ItemDetailPage() {
   const [preBookOpen, setPreBookOpen] = useState(false)
   const [messageOpen, setMessageOpen] = useState(false)
   const [message, setMessage] = useState("")
+  const [messageSent, setMessageSent] = useState(false)
+  const [messageSending, setMessageSending] = useState(false)
+  const { user } = useAuth()
 
   if (!listing) {
     notFound()
@@ -73,10 +78,54 @@ export default function ItemDetailPage() {
     setPreBookNotes("")
   }
 
-  const handleMessage = () => {
-    alert(`Message sent to ${listing.sellerName}!`)
-    setMessageOpen(false)
-    setMessage("")
+  const handleMessage = async () => {
+    if (!user) {
+      window.location.href = `/login?redirect=/item/${listing.id}`
+      return
+    }
+
+    setMessageSending(true)
+    try {
+      const supabase = createClient()
+
+      const { error } = await supabase.from("messages").insert({
+        listing_id: listing.id,
+        sender_id: user.id,
+        receiver_id: listing.sellerId,
+        content: message,
+      })
+
+      if (error) {
+        console.error("Failed to send message:", error)
+        alert("Failed to send message. Please try again.")
+        return
+      }
+
+      // Send email notification
+      await fetch("/api/messages/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sellerEmail: listing.sellerEmail,
+          sellerName: listing.sellerName,
+          buyerName: user.name,
+          listingTitle: listing.title,
+          messageContent: message,
+        }),
+      }).catch(() => {}) // Don't block on email failure
+
+      setMessageSent(true)
+      setMessage("")
+      setTimeout(() => {
+        setMessageOpen(false)
+        setMessageSent(false)
+      }, 2000)
+    } catch (err) {
+      console.error("Failed to send message:", err)
+      alert("Something went wrong. Please try again.")
+    } finally {
+      setMessageSending(false)
+    }
   }
 
   return (
@@ -230,12 +279,17 @@ export default function ItemDetailPage() {
                       />
                     </div>
                   </div>
+                  {messageSent && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+                      Message sent successfully!
+                    </div>
+                  )}
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setMessageOpen(false)}>
                       Cancel
                     </Button>
-                    <Button onClick={handleMessage} disabled={!message.trim()}>
-                      Send Message
+                    <Button onClick={handleMessage} disabled={!message.trim() || messageSending || messageSent}>
+                      {messageSending ? "Sending..." : messageSent ? "Sent!" : "Send Message"}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
