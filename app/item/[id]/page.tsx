@@ -174,17 +174,20 @@ export default function ItemDetailPage() {
     const supabase = getSupabase()
 
     // Check for existing active booking
-    const { data: existing, error: checkError } = await supabase
+    const { data: existingRows, error: checkError } = await supabase
       .from("bookings")
       .select("id, pickup_date")
       .eq("listing_id", listing.id)
       .eq("buyer_id", user.id)
       .neq("status", "cancelled")
-      .maybeSingle()
+      .order("created_at", { ascending: false })
+      .limit(1)
 
     if (checkError) {
       console.error("Failed to check existing booking:", checkError)
     }
+
+    const existing = existingRows?.[0] ?? null
 
     if (existing) {
       setExistingBooking(existing)
