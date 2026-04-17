@@ -69,11 +69,70 @@ export default function ItemDetailPage() {
     setCurrentImageIndex((prev) => (prev - 1 + listing.images.length) % listing.images.length)
   }
 
-  const handlePreBook = () => {
-    alert(`Pre-booking submitted for ${preBookDate?.toLocaleDateString()}!\nNotes: ${preBookNotes}`)
-    setPreBookOpen(false)
-    setPreBookDate(undefined)
-    setPreBookNotes("")
+  const [preBookSending, setPreBookSending] = useState(false)
+  const [preBookSuccess, setPreBookSuccess] = useState(false)
+
+  const handlePreBook = async () => {
+    if (!user) {
+      window.location.href = `/login?redirect=/item/${listing.id}`
+      return
+    }
+    if (!preBookDate) return
+
+    setPreBookSending(true)
+    try {
+      const supabase = (await import("@/lib/supabase/client")).createClient()
+
+      // Create booking record
+      const { error: bookingError } = await supabase.from("bookings").insert({
+        listing_id: listing.id,
+        buyer_id: user.id,
+        pickup_date: preBookDate.toISOString().split("T")[0],
+        notes: preBookNotes || null,
+        status: "pending",
+      })
+
+      if (bookingError) {
+        console.error("Failed to create booking:", bookingError)
+        alert("Failed to submit pre-booking. Please try again.")
+        return
+      }
+
+      // Create notification for seller
+      await supabase.from("notifications").insert({
+        user_id: listing.sellerId,
+        type: "prebooking_received",
+        title: "New Pre-booking Request",
+        message: `${user.name} has pre-booked "${listing.title}" for pickup on ${preBookDate.toLocaleDateString()}.`,
+        listing_id: listing.id,
+      })
+
+      // Send email notification
+      fetch("/api/messages/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sellerEmail: listing.sellerEmail,
+          sellerName: listing.sellerName,
+          buyerName: user.name,
+          listingTitle: listing.title,
+          messageContent: `Pre-booking request for pickup on ${preBookDate.toLocaleDateString()}. ${preBookNotes ? `Notes: ${preBookNotes}` : ""}`,
+        }),
+      }).catch(() => {})
+
+      setPreBookSuccess(true)
+      setTimeout(() => {
+        setPreBookOpen(false)
+        setPreBookSuccess(false)
+        setPreBookDate(undefined)
+        setPreBookNotes("")
+      }, 2000)
+    } catch (err) {
+      console.error("Pre-booking failed:", err)
+      alert("Something went wrong. Please try again.")
+    } finally {
+      setPreBookSending(false)
+    }
   }
 
   const openChat = () => {
@@ -271,16 +330,21 @@ export default function ItemDetailPage() {
                         </div>
                       </div>
                     </div>
+                    {preBookSuccess && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+                        Pre-booking submitted successfully! The seller will be notified.
+                      </div>
+                    )}
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setPreBookOpen(false)}>
                         Cancel
                       </Button>
                       <Button
                         onClick={handlePreBook}
-                        disabled={!preBookDate}
+                        disabled={!preBookDate || preBookSending || preBookSuccess}
                         className="bg-maize text-maize-foreground hover:bg-maize/90"
                       >
-                        Confirm Pre-booking
+                        {preBookSending ? "Submitting..." : preBookSuccess ? "Submitted!" : "Confirm Pre-booking"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>

@@ -44,30 +44,50 @@ export default function DashboardPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [convsLoading, setConvsLoading] = useState(true)
   const [openChatConv, setOpenChatConv] = useState<Conversation | null>(null)
+  const [bookings, setBookings] = useState<Array<{
+    id: string; listing_id: string; buyer_id: string; pickup_date: string; notes: string | null; status: string; created_at: string;
+    listing: { title: string } | null; buyer: { display_name: string; email: string } | null
+  }>>([])
+  const [notifications, setNotifications] = useState<Array<{
+    id: string; type: string; title: string; message: string; listing_id: string | null; is_read: boolean; created_at: string
+  }>>([])
 
   const unreadCount = conversations.reduce((count, conv) => {
     return count + conv.messages.filter((m) => !m.read && m.receiver_id === user?.id).length
   }, 0)
+  const unreadNotifs = notifications.filter((n) => !n.is_read).length
 
   useEffect(() => {
     if (!user) return
-    const fetchConversations = async () => {
-      const { data } = await supabase
-        .from("conversations")
-        .select(`
-          *,
-          listing:listings(title, images),
-          buyer:profiles!buyer_id(display_name, email),
-          seller:profiles!seller_id(display_name, email),
-          messages(content, created_at, read, sender_id, receiver_id)
-        `)
-        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
-        .order("created_at", { ascending: false })
-      setConversations((data as Conversation[]) || [])
-      setConvsLoading(false)
-    }
-    fetchConversations()
-  }, [user, supabase])
+
+    // Fetch conversations
+    supabase
+      .from("conversations")
+      .select(`*, listing:listings(title, images), buyer:profiles!buyer_id(display_name, email), seller:profiles!seller_id(display_name, email), messages(content, created_at, read, sender_id, receiver_id)`)
+      .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setConversations((data as Conversation[]) || [])
+        setConvsLoading(false)
+      })
+
+    // Fetch bookings (where user is seller)
+    supabase
+      .from("bookings")
+      .select("*, listing:listings(title), buyer:profiles!buyer_id(display_name, email)")
+      .in("listing_id", myListings.map((l) => l.id).length > 0 ? myListings.map((l) => l.id) : ["00000000-0000-0000-0000-000000000000"])
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setBookings(data || []))
+
+    // Fetch notifications
+    supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(20)
+      .then(({ data }) => setNotifications(data || []))
+  }, [user, supabase, myListings])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -346,15 +366,66 @@ export default function DashboardPage() {
 
           {/* Pre-bookings Tab */}
           <TabsContent value="prebookings" className="mt-6">
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-semibold mb-2">No pre-bookings yet</h3>
-                <p className="text-muted-foreground">
-                  Enable pre-booking on your listings to let buyers reserve items!
-                </p>
-              </CardContent>
-            </Card>
+            {/* Notifications */}
+            {notifications.length > 0 && (
+              <div className="mb-4 space-y-2">
+                {notifications.filter((n) => !n.is_read).map((notif) => (
+                  <div key={notif.id} className="flex items-start gap-3 p-3 bg-maize/10 border border-maize/30 rounded-lg text-sm">
+                    <Calendar className="w-4 h-4 mt-0.5 text-maize-foreground shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-medium">{notif.title}</p>
+                      <p className="text-muted-foreground">{notif.message}</p>
+                    </div>
+                    <button
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                      onClick={async () => {
+                        await supabase.from("notifications").update({ is_read: true }).eq("id", notif.id)
+                        setNotifications((prev) => prev.map((n) => n.id === notif.id ? { ...n, is_read: true } : n))
+                      }}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {bookings.length > 0 ? (
+              <div className="space-y-3">
+                {bookings.map((booking) => (
+                  <Card key={booking.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-semibold">{booking.listing?.title || "Listing"}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Buyer: {booking.buyer?.display_name || booking.buyer?.email || "Unknown"}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2 text-sm">
+                            <Calendar className="w-4 h-4 text-primary" />
+                            <span>Pickup: <strong>{new Date(booking.pickup_date).toLocaleDateString()}</strong></span>
+                          </div>
+                          {booking.notes && (
+                            <p className="text-sm text-muted-foreground mt-1">Notes: {booking.notes}</p>
+                          )}
+                        </div>
+                        <Badge className="bg-maize/20 text-maize-foreground">{booking.status}</Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="font-semibold mb-2">No pre-bookings yet</h3>
+                  <p className="text-muted-foreground">
+                    Enable pre-booking on your listings to let buyers reserve items!
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Messages Tab */}
